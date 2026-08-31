@@ -15,13 +15,13 @@ export interface PredictionInput {
 /**
  * Calculates score and category for a single match prediction.
  *
- * Rules:
- * - 3 pts: Exact score (e.g., 2:1 vs 2:1, or 1:1 vs 1:1)
- * - 2 pts: Correct winner + correct goal difference, but NOT exact score (e.g., 2:0 vs 3:1)
- * - 1 pt:  Correct outcome (home win, away win, or non-exact draw like 1:1 vs 2:2) without correct goal diff
- * - 0 pts: Incorrect outcome
+ * Official TyperLM26 Scoring Rules:
+ * - 3 pts: Exact score (e.g., 2:1 vs 2:1, or exact draw 1:1 vs 1:1) -> category 'exact'
+ * - 2 pts: Correct goal difference & winner (e.g., 2:0 vs 3:1) OR any non-exact correctly predicted draw (e.g., 1:1 vs 2:2, 0:0 vs 3:3) -> category 'diff'
+ * - 1 pt:  Correct winner/outcome without correct goal difference (e.g., 2:1 vs 1:0) -> category 'outcome'
+ * - 0 pts: Incorrect outcome (e.g., 2:1 vs 0:1) -> category 'incorrect'
  *
- * Points NEVER sum up. Maximum is 3 points.
+ * Points NEVER sum up. Maximum is 3 points per match.
  */
 export function calculateMatchScore({
   userHome,
@@ -45,16 +45,46 @@ export function calculateMatchScore({
     return { points: 0, category: "incorrect" };
   }
 
-  // 3. For draws: exact draw was handled in step 1. Any other predicted draw when actual is draw gives 1 pt.
+  // 3. For draws: exact draw was handled in step 1. Any other predicted draw when actual is a draw has diff=0 -> 2 pts ('diff')
   if (userOutcome === 0 && actualOutcome === 0) {
-    return { points: 1, category: "outcome" };
+    return { points: 2, category: "diff" };
   }
 
-  // 4. For wins: if goal difference is exact (e.g. user 2:0, actual 3:1 -> diff +2) -> 2 points
+  // 4. For wins: if goal difference is exact (e.g. user 2:0, actual 3:1 -> diff +2) -> 2 points ('diff')
   if (userDiff === actualDiff) {
     return { points: 2, category: "diff" };
   }
 
-  // 5. Correct winner, but different goal difference (e.g. user 2:1, actual 3:0) -> 1 point
+  // 5. Correct winner, but different goal difference (e.g. user 2:1, actual 1:0) -> 1 point ('outcome')
   return { points: 1, category: "outcome" };
+}
+
+/**
+ * Calculates dynamic live points preview for an in-progress match.
+ */
+export function calculateLivePoints(
+  userHome: number | null | undefined,
+  userAway: number | null | undefined,
+  liveHome: number | null | undefined,
+  liveAway: number | null | undefined
+): MatchScoreResult | null {
+  if (
+    userHome === null ||
+    userHome === undefined ||
+    userAway === null ||
+    userAway === undefined ||
+    liveHome === null ||
+    liveHome === undefined ||
+    liveAway === null ||
+    liveAway === undefined
+  ) {
+    return null;
+  }
+
+  return calculateMatchScore({
+    userHome,
+    userAway,
+    actualHome: liveHome,
+    actualAway: liveAway,
+  });
 }

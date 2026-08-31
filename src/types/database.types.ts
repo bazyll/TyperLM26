@@ -145,6 +145,7 @@ export interface Database {
           home_team_id: string;
           away_team_id: string;
           kickoff_at: string;
+          is_betting_locked: boolean;
           status: MatchStatus;
           home_score: number | null;
           away_score: number | null;
@@ -159,6 +160,7 @@ export interface Database {
           home_team_id: string;
           away_team_id: string;
           kickoff_at: string;
+          is_betting_locked?: boolean;
           status?: MatchStatus;
           home_score?: number | null;
           away_score?: number | null;
@@ -173,6 +175,7 @@ export interface Database {
           home_team_id?: string;
           away_team_id?: string;
           kickoff_at?: string;
+          is_betting_locked?: boolean;
           status?: MatchStatus;
           home_score?: number | null;
           away_score?: number | null;
@@ -508,6 +511,14 @@ export interface Database {
           is_allowed: boolean;
           remaining_seconds: number;
         }[];
+      };
+      finalize_and_score_match: {
+        Args: {
+          p_match_id: string;
+          p_home_score: number;
+          p_away_score: number;
+        };
+        Returns: void;
       };
     };
     Enums: {

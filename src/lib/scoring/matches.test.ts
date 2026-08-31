@@ -1,98 +1,128 @@
 import { describe, it, expect } from "vitest";
-import { calculateMatchScore } from "./matches";
+import { calculateMatchScore, calculateLivePoints } from "./matches";
 
-describe("Match Scoring Logic (Max 3 points, No summing)", () => {
-  it("awards 3 points for exact score (home win)", () => {
-    const result = calculateMatchScore({
+describe("Official UEFA Champions League Match Scoring Engine", () => {
+  it("awards 3 pts (exact) for exact match score (e.g. 2:1 vs 2:1)", () => {
+    const res = calculateMatchScore({
       userHome: 2,
       userAway: 1,
       actualHome: 2,
       actualAway: 1,
     });
-    expect(result.points).toBe(3);
-    expect(result.category).toBe("exact");
+    expect(res.points).toBe(3);
+    expect(res.category).toBe("exact");
   });
 
-  it("awards 3 points for exact score (draw)", () => {
-    const result = calculateMatchScore({
-      userHome: 2,
-      userAway: 2,
+  it("awards 3 pts (exact) for exact draw (e.g. 1:1 vs 1:1, 0:0 vs 0:0)", () => {
+    const res1 = calculateMatchScore({
+      userHome: 1,
+      userAway: 1,
+      actualHome: 1,
+      actualAway: 1,
+    });
+    expect(res1.points).toBe(3);
+    expect(res1.category).toBe("exact");
+
+    const res2 = calculateMatchScore({
+      userHome: 0,
+      userAway: 0,
+      actualHome: 0,
+      actualAway: 0,
+    });
+    expect(res2.points).toBe(3);
+    expect(res2.category).toBe("exact");
+  });
+
+  it("awards 2 pts (diff) for different correctly predicted draw (e.g. 1:1 vs 2:2, 0:0 vs 3:3)", () => {
+    const res1 = calculateMatchScore({
+      userHome: 1,
+      userAway: 1,
       actualHome: 2,
       actualAway: 2,
     });
-    expect(result.points).toBe(3);
-    expect(result.category).toBe("exact");
+    expect(res1.points).toBe(2);
+    expect(res1.category).toBe("diff");
+
+    const res2 = calculateMatchScore({
+      userHome: 0,
+      userAway: 0,
+      actualHome: 3,
+      actualAway: 3,
+    });
+    expect(res2.points).toBe(2);
+    expect(res2.category).toBe("diff");
+
+    const res3 = calculateMatchScore({
+      userHome: 2,
+      userAway: 2,
+      actualHome: 1,
+      actualAway: 1,
+    });
+    expect(res3.points).toBe(2);
+    expect(res3.category).toBe("diff");
   });
 
-  it("awards 2 points for correct goal difference (home win)", () => {
-    // Prediction 2:0, Result 3:1 (both diff +2, home won)
-    const result = calculateMatchScore({
+  it("awards 2 pts (diff) for correct winner + correct goal difference (e.g. 2:0 vs 3:1)", () => {
+    const res = calculateMatchScore({
       userHome: 2,
       userAway: 0,
       actualHome: 3,
       actualAway: 1,
     });
-    expect(result.points).toBe(2);
-    expect(result.category).toBe("diff");
+    expect(res.points).toBe(2);
+    expect(res.category).toBe("diff");
   });
 
-  it("awards 2 points for correct goal difference (away win)", () => {
-    // Prediction 1:3, Result 0:2 (both diff -2, away won)
-    const result = calculateMatchScore({
-      userHome: 1,
-      userAway: 3,
-      actualHome: 0,
-      actualAway: 2,
+  it("awards 1 pt (outcome) for correct winner with incorrect goal difference (e.g. 3:1 vs 1:0, 2:1 vs 3:0)", () => {
+    const res1 = calculateMatchScore({
+      userHome: 3,
+      userAway: 1,
+      actualHome: 1,
+      actualAway: 0,
     });
-    expect(result.points).toBe(2);
-    expect(result.category).toBe("diff");
-  });
+    expect(res1.points).toBe(1);
+    expect(res1.category).toBe("outcome");
 
-  it("awards 1 point for correct winner with different goal difference", () => {
-    // Prediction 2:1 (diff +1), Result 3:0 (diff +3) -> only 1 pt
-    const result = calculateMatchScore({
+    const res2 = calculateMatchScore({
       userHome: 2,
       userAway: 1,
       actualHome: 3,
       actualAway: 0,
     });
-    expect(result.points).toBe(1);
-    expect(result.category).toBe("outcome");
+    expect(res2.points).toBe(1);
+    expect(res2.category).toBe("outcome");
   });
 
-  it("awards 1 point for predicted draw when result is a different draw", () => {
-    // Prediction 1:1, Result 2:2 -> 1 pt
-    const result = calculateMatchScore({
-      userHome: 1,
-      userAway: 1,
-      actualHome: 2,
-      actualAway: 2,
-    });
-    expect(result.points).toBe(1);
-    expect(result.category).toBe("outcome");
-  });
-
-  it("awards 0 points for completely wrong outcome", () => {
-    // Prediction 2:1 (home win), Result 0:1 (away win)
-    const result = calculateMatchScore({
+  it("awards 0 pts (incorrect) for incorrect outcome (e.g. 2:1 vs 0:1)", () => {
+    const res = calculateMatchScore({
       userHome: 2,
       userAway: 1,
       actualHome: 0,
       actualAway: 1,
     });
-    expect(result.points).toBe(0);
-    expect(result.category).toBe("incorrect");
+    expect(res.points).toBe(0);
+    expect(res.category).toBe("incorrect");
   });
 
-  it("awards 0 points when predicted draw but match had a winner", () => {
-    // Prediction 1:1, Result 1:0
-    const result = calculateMatchScore({
-      userHome: 1,
+  it("never exceeds maximum of 3 points and categories never sum up", () => {
+    const res = calculateMatchScore({
+      userHome: 3,
       userAway: 1,
-      actualHome: 1,
-      actualAway: 0,
+      actualHome: 3,
+      actualAway: 1,
     });
-    expect(result.points).toBe(0);
-    expect(result.category).toBe("incorrect");
+    expect(res.points).toBe(3);
+    expect(res.points).not.toBe(6); // 3 + 2 + 1
+  });
+
+  it("calculates live preview points dynamically", () => {
+    const livePreview = calculateLivePoints(2, 1, 2, 1);
+    expect(livePreview?.points).toBe(3);
+    expect(livePreview?.category).toBe("exact");
+
+    const liveDiff = calculateLivePoints(1, 1, 2, 2);
+    expect(liveDiff?.points).toBe(2);
+
+    expect(calculateLivePoints(null, 1, 2, 1)).toBeNull();
   });
 });

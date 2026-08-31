@@ -17,6 +17,7 @@ export interface MatchWithTeams {
   matchday: number | null;
   stage: "league" | "playoff" | "round_of_16" | "quarter_finals" | "semi_finals" | "final";
   kickoffAt: string;
+  isBettingLocked: boolean;
   status: "scheduled" | "live" | "finished" | "postponed" | "cancelled";
   homeScore: number | null;
   awayScore: number | null;
@@ -36,27 +37,24 @@ export interface MatchWithTeams {
     logoUrl: string;
   };
   userPrediction?: {
+    id?: string;
     homeScore: number;
     awayScore: number;
     pointsAwarded?: number | null;
     scoringCategory?: "exact" | "diff" | "outcome" | "incorrect" | null;
   };
-}
-
-export interface SpecialPredictionWithDetails {
-  id: string;
-  slug: string;
-  title: string;
-  description: string | null;
-  targetType: "team" | "player";
-  pointsValue: number;
-  deadlineAt: string;
-  status: "open" | "locked" | "settled";
-  userAnswer?: {
-    selectedTeamId?: string | null;
-    selectedPlayerId?: string | null;
+  allPredictions?: Array<{
+    userId: string;
+    username: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl: string | null;
+    homeScore: number;
+    awayScore: number;
     pointsAwarded?: number | null;
-  };
+    scoringCategory?: "exact" | "diff" | "outcome" | "incorrect" | null;
+    livePoints?: number;
+  }>;
 }
 
 export interface LeaderboardEntry {
@@ -66,11 +64,25 @@ export interface LeaderboardEntry {
   firstName: string;
   lastName: string;
   avatarUrl: string | null;
+  matchPoints: number;
+  specialPoints: number;
+  pickemPoints: number;
   totalPoints: number;
   exactScoresCount: number;
   diffScoresCount: number;
   outcomeScoresCount: number;
-  accuracyRate: number;
-  currentStreak: number;
-  bestStreak: number;
+  incorrectScoresCount: number;
+  predictedMatchesCount: number;
+  accuracyRate: number; // percentage of predictions with > 0 pts
+}
+
+export interface UserMatchStats {
+  predictedMatchesCount: number;
+  totalPoints: number;
+  exactScoresCount: number;
+  diffScoresCount: number;
+  outcomeScoresCount: number;
+  incorrectScoresCount: number;
+  averagePointsPerMatch: number;
+  accuracyRate: number; // (exact + diff + outcome) / predictedMatchesCount * 100
 }

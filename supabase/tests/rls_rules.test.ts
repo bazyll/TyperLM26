@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 /**
- * PostgreSQL / RLS Security Policy Verification Suite (Milestone 2)
+ * PostgreSQL / RLS Security Policy Verification Suite (Milestone 3)
  *
  * This suite models and verifies all PostgreSQL Row Level Security (RLS) expressions,
  * column constraints, auth_mappings isolation, and security definer triggers defined in
@@ -19,11 +19,19 @@ describe("PostgreSQL Database & RLS Security Policy Verification", () => {
   const futureMatch = {
     id: "match-future",
     kickoffAt: new Date("2026-09-15T19:00:00Z").getTime(), // > mockNow
+    isBettingLocked: false,
+  };
+
+  const futureLockedMatch = {
+    id: "match-future-locked",
+    kickoffAt: new Date("2026-09-15T19:00:00Z").getTime(),
+    isBettingLocked: true, // e.g. postponed after original kickoff
   };
 
   const pastMatch = {
     id: "match-past",
     kickoffAt: new Date("2026-09-15T17:00:00Z").getTime(), // <= mockNow
+    isBettingLocked: true,
   };
 
   const predictionUserB_Future = {
@@ -44,13 +52,13 @@ describe("PostgreSQL Database & RLS Security Policy Verification", () => {
   function rlsCanSelectPrediction(
     viewer: { id: string; role: string; isActive: boolean } | null,
     pred: { userId: string; matchId: string },
-    match: { id: string; kickoffAt: number },
+    match: { id: string; kickoffAt: number; isBettingLocked: boolean },
     currentTimestamp: number = mockNow
   ): boolean {
     if (!viewer) return false; // Anonymous
     if (viewer.id === pred.userId) return true; // Own prediction
     if (viewer.role === "admin" && viewer.isActive) return true; // Admin
-    if (match.kickoffAt <= currentTimestamp) return true; // Match already started
+    if (match.kickoffAt <= currentTimestamp || match.isBettingLocked) return true; // Match already started or locked
     return false; // Hidden before kickoff
   }
 
@@ -58,12 +66,13 @@ describe("PostgreSQL Database & RLS Security Policy Verification", () => {
   function rlsCanInsertOrUpdatePrediction(
     editor: { id: string; role: string; isActive: boolean } | null,
     targetUserId: string,
-    match: { kickoffAt: number },
+    match: { kickoffAt: number; isBettingLocked: boolean },
     currentTimestamp: number = mockNow
   ): boolean {
     if (!editor) return false;
     if (!editor.isActive) return false; // Deactivated user BLOCKED immediately!
     if (editor.id !== targetUserId) return false; // Cannot modify other's prediction
+    if (match.isBettingLocked) return false; // Cannot modify when betting is locked
     if (match.kickoffAt <= currentTimestamp) return false; // Cannot modify after kickoff!
     return true;
   }
@@ -102,7 +111,7 @@ describe("PostgreSQL Database & RLS Security Policy Verification", () => {
     expect(rlsCanAccessAuthMappings("service_role")).toBe(true);
   });
 
-  it("4. User A CANNOT view User B's prediction BEFORE kickoff", () => {
+  it("4. User A CANNOT view User B's prediction BEFORE kickoff when not locked", () => {
     const canView = rlsCanSelectPrediction(activeUserA, predictionUserB_Future, futureMatch);
     expect(canView).toBe(false);
   });
@@ -112,29 +121,35 @@ describe("PostgreSQL Database & RLS Security Policy Verification", () => {
     expect(canView).toBe(true);
   });
 
-  it("6. Deactivated user is IMMEDIATELY blocked from inserting or updating predictions", () => {
+  it("6. User A CAN view User B's prediction if betting was locked (e.g. postponed after kickoff)", () => {
+    const canView = rlsCanSelectPrediction(activeUserA, predictionUserB_Future, futureLockedMatch);
+    expect(canView).toBe(true);
+  });
+
+  it("7. Deactivated user is IMMEDIATELY blocked from inserting or updating predictions", () => {
     const canEdit = rlsCanInsertOrUpdatePrediction(deactivatedUser, deactivatedUser.id, futureMatch);
     expect(canEdit).toBe(false);
   });
 
-  it("7. Active user can update own prediction before kickoff but NOT after", () => {
+  it("8. Active user can update own prediction before kickoff but NOT after or when locked", () => {
     expect(rlsCanInsertOrUpdatePrediction(activeUserA, activeUserA.id, futureMatch)).toBe(true);
     expect(rlsCanInsertOrUpdatePrediction(activeUserA, activeUserA.id, pastMatch)).toBe(false);
+    expect(rlsCanInsertOrUpdatePrediction(activeUserA, activeUserA.id, futureLockedMatch)).toBe(false);
   });
 
-  it("8. Regular user cannot change first_name, last_name, role or is_active", () => {
+  it("9. Regular user cannot change first_name, last_name, role or is_active", () => {
     expect(canUpdateProfileField(activeUserA, activeUserA.id, "first_name")).toBe(false);
     expect(canUpdateProfileField(activeUserA, activeUserA.id, "last_name")).toBe(false);
     expect(canUpdateProfileField(activeUserA, activeUserA.id, "role")).toBe(false);
     expect(canUpdateProfileField(activeUserA, activeUserA.id, "is_active")).toBe(false);
   });
 
-  it("9. Regular user can change username and avatar_url", () => {
+  it("10. Regular user can change username and avatar_url", () => {
     expect(canUpdateProfileField(activeUserA, activeUserA.id, "username")).toBe(true);
     expect(canUpdateProfileField(activeUserA, activeUserA.id, "avatar_url")).toBe(true);
   });
 
-  it("10. Admin can manage profile fields", () => {
+  it("11. Admin can manage profile fields", () => {
     expect(canUpdateProfileField(adminUser, activeUserA.id, "role")).toBe(true);
     expect(canUpdateProfileField(adminUser, activeUserA.id, "first_name")).toBe(true);
   });

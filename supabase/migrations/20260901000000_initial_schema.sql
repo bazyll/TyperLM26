@@ -14,6 +14,7 @@ DROP FUNCTION IF EXISTS public.check_prediction_update_permissions() CASCADE;
 DROP FUNCTION IF EXISTS public.sync_profile_username_to_auth_mappings() CASCADE;
 DROP FUNCTION IF EXISTS public.set_updated_at() CASCADE;
 DROP FUNCTION IF EXISTS public.check_and_record_login_attempt(TEXT, TEXT, INT, INT) CASCADE;
+DROP FUNCTION IF EXISTS public.finalize_and_score_match(UUID, INT, INT) CASCADE;
 
 -- 3. Helper trigger for updated_at
 CREATE OR REPLACE FUNCTION public.set_updated_at()
@@ -151,7 +152,7 @@ CREATE TABLE IF NOT EXISTS public.players (
 CREATE INDEX IF NOT EXISTS idx_players_team_id ON public.players(team_id);
 
 -- ============================================================================
--- 7. Matches Table
+-- 7. Matches Table (With is_betting_locked and Status Constraints)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.matches (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -160,10 +161,11 @@ CREATE TABLE IF NOT EXISTS public.matches (
   home_team_id UUID NOT NULL REFERENCES public.teams(id) ON DELETE RESTRICT,
   away_team_id UUID NOT NULL REFERENCES public.teams(id) ON DELETE RESTRICT,
   kickoff_at TIMESTAMPTZ NOT NULL,
+  is_betting_locked BOOLEAN NOT NULL DEFAULT FALSE,
   status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'live', 'finished', 'postponed', 'cancelled')),
-  home_score INT CHECK (home_score >= 0),
-  away_score INT CHECK (away_score >= 0),
-  live_minute INT CHECK (live_minute >= 0),
+  home_score INT CHECK (home_score >= 0 AND home_score <= 99),
+  away_score INT CHECK (away_score >= 0 AND away_score <= 99),
+  live_minute INT CHECK (live_minute >= 0 AND live_minute <= 130),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT check_different_teams CHECK (home_team_id <> away_team_id)
@@ -219,7 +221,69 @@ FOR EACH ROW
 EXECUTE FUNCTION public.check_prediction_update_permissions();
 
 -- ============================================================================
--- 9. Special Predictions Categories & Predictions
+-- 9. Atomic Match Finalization and Points Calculation Function (PostgreSQL)
+-- ============================================================================
+CREATE OR REPLACE FUNCTION public.finalize_and_score_match(
+  p_match_id UUID,
+  p_home_score INT,
+  p_away_score INT
+)
+RETURNS VOID AS $$
+DECLARE
+  pred RECORD;
+  v_points INT;
+  v_cat TEXT;
+BEGIN
+  -- 1. Update match to finished with final score and lock betting permanently
+  UPDATE public.matches
+  SET status = 'finished',
+      home_score = p_home_score,
+      away_score = p_away_score,
+      is_betting_locked = TRUE,
+      updated_at = now()
+  WHERE id = p_match_id;
+
+  -- 2. Recalculate all predictions for this match atomically
+  FOR pred IN
+    SELECT id, home_score, away_score
+    FROM public.predictions
+    WHERE match_id = p_match_id
+  LOOP
+    -- Calculate points according to official rules:
+    -- Exact score (including exact draws like 1:1) -> 3 pts
+    IF pred.home_score = p_home_score AND pred.away_score = p_away_score THEN
+      v_points := 3;
+      v_cat := 'exact';
+    -- Correct goal diff & winner OR non-exact draw (1:1 vs 2:2, 0:0 vs 3:3) -> 2 pts
+    ELSIF (pred.home_score - pred.away_score) = (p_home_score - p_away_score) AND
+          ((pred.home_score > pred.away_score AND p_home_score > p_away_score) OR
+           (pred.home_score < pred.away_score AND p_home_score < p_away_score) OR
+           (pred.home_score = pred.away_score AND p_home_score = p_away_score)) THEN
+      v_points := 2;
+      v_cat := 'diff';
+    -- Correct outcome / winner without correct goal diff -> 1 pt
+    ELSIF (pred.home_score > pred.away_score AND p_home_score > p_away_score) OR
+          (pred.home_score < pred.away_score AND p_home_score < p_away_score) THEN
+      v_points := 1;
+      v_cat := 'outcome';
+    -- Incorrect outcome -> 0 pts
+    ELSE
+      v_points := 0;
+      v_cat := 'incorrect';
+    END IF;
+
+    -- Update prediction points atomically
+    UPDATE public.predictions
+    SET points_awarded = v_points,
+        scoring_category = v_cat,
+        updated_at = now()
+    WHERE id = pred.id;
+  END LOOP;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 10. Special Predictions Categories & Predictions
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.special_prediction_categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -251,7 +315,7 @@ CREATE INDEX IF NOT EXISTS idx_spec_pred_user ON public.special_predictions(user
 CREATE INDEX IF NOT EXISTS idx_spec_pred_cat ON public.special_predictions(category_id);
 
 -- ============================================================================
--- 10. Pick'em Config & Submissions
+-- 11. Pick'em Config & Submissions
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.pickem_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -275,7 +339,7 @@ CREATE TABLE IF NOT EXISTS public.pickem_submissions (
 CREATE INDEX IF NOT EXISTS idx_pickem_user ON public.pickem_submissions(user_id);
 
 -- ============================================================================
--- 11. Announcements & Comments
+-- 12. Announcements & Comments
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.announcements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -299,7 +363,7 @@ CREATE TABLE IF NOT EXISTS public.announcement_comments (
 CREATE INDEX IF NOT EXISTS idx_comments_announcement ON public.announcement_comments(announcement_id);
 
 -- ============================================================================
--- 12. Audit Logs (Append-Only Security Log)
+-- 13. Audit Logs (Append-Only Security Log)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -315,7 +379,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON public.audit_logs(created_at DES
 CREATE INDEX IF NOT EXISTS idx_audit_actor ON public.audit_logs(actor_id);
 
 -- ============================================================================
--- 13. Serverless Persistent Atomic Rate Limiting (With Auto-Cleanup)
+-- 14. Serverless Persistent Atomic Rate Limiting (With Auto-Cleanup)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.login_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -382,7 +446,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
--- 14. Row Level Security (RLS) Configuration (With is_active_user checks)
+-- 15. Row Level Security (RLS) Configuration
 -- ============================================================================
 
 -- Enable RLS on all tables
@@ -462,6 +526,7 @@ WITH CHECK (public.is_admin());
 -- ----------------------------------------------------------------------------
 -- PREDICTIONS POLICIES (Immediate is_active_user & Kickoff Enforcement)
 -- ----------------------------------------------------------------------------
+-- SELECT: Own prediction always, others only after kickoff or if betting is locked
 CREATE POLICY "predictions_select_policy"
 ON public.predictions FOR SELECT
 TO authenticated
@@ -471,10 +536,11 @@ USING (
   OR EXISTS (
     SELECT 1 FROM public.matches
     WHERE matches.id = predictions.match_id
-      AND matches.kickoff_at <= now()
+      AND (matches.kickoff_at <= now() OR matches.is_betting_locked = TRUE)
   )
 );
 
+-- INSERT: Only active user, only own prediction, strictly before kickoff & not locked
 CREATE POLICY "predictions_insert_policy"
 ON public.predictions FOR INSERT
 TO authenticated
@@ -485,9 +551,11 @@ WITH CHECK (
     SELECT 1 FROM public.matches
     WHERE matches.id = predictions.match_id
       AND matches.kickoff_at > now()
+      AND matches.is_betting_locked = FALSE
   )
 );
 
+-- UPDATE: Only active user, only own prediction, strictly before kickoff & not locked
 CREATE POLICY "predictions_update_policy"
 ON public.predictions FOR UPDATE
 TO authenticated
@@ -498,6 +566,7 @@ USING (
     SELECT 1 FROM public.matches
     WHERE matches.id = predictions.match_id
       AND matches.kickoff_at > now()
+      AND matches.is_betting_locked = FALSE
   )
 )
 WITH CHECK (
@@ -507,6 +576,7 @@ WITH CHECK (
     SELECT 1 FROM public.matches
     WHERE matches.id = predictions.match_id
       AND matches.kickoff_at > now()
+      AND matches.is_betting_locked = FALSE
   )
 );
 
@@ -706,7 +776,7 @@ USING (public.is_admin())
 WITH CHECK (public.is_admin());
 
 -- ============================================================================
--- 15. Storage Configuration (Avatars Bucket with Storage RLS & is_active_user)
+-- 16. Storage Configuration (Avatars Bucket with Storage RLS & is_active_user)
 -- ============================================================================
 DO $$
 BEGIN
@@ -720,21 +790,18 @@ BEGIN
   END IF;
 END $$;
 
--- Storage RLS on storage.objects (if table exists)
+-- Storage RLS on storage.objects
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'objects') THEN
-    -- Enable RLS
     ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
-    -- SELECT: authenticated users can read avatars
     DROP POLICY IF EXISTS "storage_avatars_select" ON storage.objects;
     CREATE POLICY "storage_avatars_select"
     ON storage.objects FOR SELECT
     TO authenticated
     USING (bucket_id = 'avatars');
 
-    -- INSERT: only active owner can insert into their own folder
     DROP POLICY IF EXISTS "storage_avatars_insert" ON storage.objects;
     CREATE POLICY "storage_avatars_insert"
     ON storage.objects FOR INSERT
@@ -745,7 +812,6 @@ BEGIN
       AND public.is_active_user()
     );
 
-    -- UPDATE: only active owner can update their own folder
     DROP POLICY IF EXISTS "storage_avatars_update" ON storage.objects;
     CREATE POLICY "storage_avatars_update"
     ON storage.objects FOR UPDATE
@@ -761,7 +827,6 @@ BEGIN
       AND public.is_active_user()
     );
 
-    -- DELETE: only active owner or admin can delete
     DROP POLICY IF EXISTS "storage_avatars_delete" ON storage.objects;
     CREATE POLICY "storage_avatars_delete"
     ON storage.objects FOR DELETE

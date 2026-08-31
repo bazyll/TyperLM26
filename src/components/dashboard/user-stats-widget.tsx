@@ -1,8 +1,15 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Target, Trophy, Award, Flame } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { UserMatchStats } from "@/types";
 
-export function UserStatsWidget() {
+interface UserStatsWidgetProps {
+  stats: UserMatchStats | null;
+  userRank?: number;
+  totalUsers?: number;
+}
+
+export function UserStatsWidget({ stats, userRank, totalUsers }: UserStatsWidgetProps) {
   return (
     <Card className="rounded-3xl border-[#182645] bg-[#0c1527] overflow-hidden shadow-xl">
       <CardHeader className="p-5 pb-3">
@@ -16,19 +23,25 @@ export function UserStatsWidget() {
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-[#162444]/40 border border-[#182645] p-3 text-center flex flex-col justify-center">
             <span className="text-[11px] font-medium text-slate-400">
-              Pozycja w rankingu
+              Pozycja w lidze
             </span>
             <div className="text-lg font-extrabold text-white mt-1">
-              1 <span className="text-xs text-slate-400 font-normal">/ 10</span>
+              {userRank ? (
+                <>
+                  {userRank} <span className="text-xs text-slate-400 font-normal">/ {totalUsers || 10}</span>
+                </>
+              ) : (
+                "-"
+              )}
             </div>
           </div>
 
           <div className="rounded-2xl bg-[#162444]/40 border border-[#182645] p-3 text-center flex flex-col justify-center">
             <span className="text-[11px] font-medium text-slate-400">
-              Suma punktów
+              Punkty meczowe
             </span>
             <div className="text-lg font-extrabold text-blue-400 mt-1">
-              1 250
+              {stats ? stats.totalPoints : 0}
             </div>
           </div>
         </div>
@@ -37,20 +50,19 @@ export function UserStatsWidget() {
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-[#162444]/40 border border-[#182645] p-3 text-center flex flex-col justify-center">
             <span className="text-[11px] font-medium text-slate-400">
-              Trafione typy
+              Skuteczność
             </span>
             <div className="text-base font-extrabold text-emerald-400 mt-1">
-              68%
+              {stats ? `${stats.accuracyRate}%` : "0%"}
             </div>
           </div>
 
           <div className="rounded-2xl bg-[#162444]/40 border border-[#182645] p-3 text-center flex flex-col justify-center">
             <span className="text-[11px] font-medium text-slate-400">
-              Najlepsza seria
+              Dokładne (3p)
             </span>
-            <div className="text-base font-extrabold text-amber-400 mt-1 flex items-center justify-center gap-1">
-              <span>5</span>
-              <span>🔥</span>
+            <div className="text-base font-extrabold text-amber-400 mt-1">
+              {stats ? stats.exactScoresCount : 0}
             </div>
           </div>
         </div>
@@ -61,7 +73,7 @@ export function UserStatsWidget() {
             href="/konto"
             className="inline-flex items-center text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors py-1"
           >
-            <span>Szczegółowe statystyki</span>
+            <span>Szczegółowa historia</span>
             <ChevronRight className="w-4 h-4 ml-0.5" />
           </Link>
         </div>

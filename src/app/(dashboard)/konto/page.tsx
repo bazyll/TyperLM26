@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useRef } from "react";
-import { User, Settings, Lock, Upload, Save, Trophy, Flame, Shield, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { User, Settings, Lock, Upload, Save, Trophy, Flame, Shield, CheckCircle, AlertCircle, Loader2, Calendar } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,11 +13,15 @@ import {
   updateAvatarUrlAction,
   getCurrentUserProfile,
 } from "@/lib/auth/actions";
+import { getUserStatsAction, getLeaderboardAction, getMatchesWithPredictionsAction } from "@/lib/matches/actions";
 import { uploadAvatar } from "@/lib/supabase/storage";
-import { UserProfile } from "@/types";
+import { UserProfile, UserMatchStats, MatchWithTeams } from "@/types";
 
 export default function AccountPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [stats, setStats] = useState<UserMatchStats | null>(null);
+  const [userRank, setUserRank] = useState<number | undefined>(undefined);
+  const [userMatches, setUserMatches] = useState<MatchWithTeams[]>([]);
   const [loading, setLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -33,12 +37,30 @@ export default function AccountPage() {
 
   useEffect(() => {
     async function load() {
-      const p = await getCurrentUserProfile();
-      if (p) {
-        setProfile(p);
-        setUsernameInput(p.username);
+      try {
+        const p = await getCurrentUserProfile();
+        if (p) {
+          setProfile(p);
+          setUsernameInput(p.username);
+
+          const [userStats, leaderboard, allMatches] = await Promise.all([
+            getUserStatsAction(p.id),
+            getLeaderboardAction(),
+            getMatchesWithPredictionsAction(),
+          ]);
+
+          setStats(userStats);
+          const rank = leaderboard.find((e) => e.userId === p.id)?.rank;
+          setUserRank(rank);
+
+          const predictedMatches = allMatches.filter((m) => m.userPrediction);
+          setUserMatches(predictedMatches);
+        }
+      } catch (err) {
+        console.error("Error loading account data:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     load();
   }, []);
@@ -134,7 +156,7 @@ export default function AccountPage() {
           className="rounded-xl border-blue-500/30 text-xs font-semibold"
         >
           <Settings className="w-4 h-4 mr-2" />
-          {showSettings ? "Powrót do podglądu profilu" : "Ustawienia konta"}
+          {showSettings ? "Powrót do profilu" : "Ustawienia konta"}
         </Button>
       </div>
 
@@ -157,8 +179,9 @@ export default function AccountPage() {
       )}
 
       {!showSettings ? (
-        /* Normal Profile View */
+        /* Normal Profile View with Stats & Matches */
         <div className="flex flex-col gap-6">
+          {/* Main User Banner */}
           <Card className="rounded-3xl border-[#182645] bg-[#0c1527] p-6 sm:p-8 shadow-2xl relative overflow-hidden">
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
               <Avatar className="w-24 h-24 sm:w-28 sm:h-28 border-2 border-blue-500/40 shadow-xl">
@@ -171,7 +194,7 @@ export default function AccountPage() {
               <div className="flex-1 flex flex-col items-center sm:items-start text-center sm:text-left gap-2">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
                   <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-                    {profile ? `${profile.firstName} ${profile.lastName}` : "Bartosz Kowalski"}
+                    {profile ? `${profile.firstName} ${profile.lastName}` : "Bartosz"}
                   </h2>
                   {profile?.role === "admin" && (
                     <Badge variant="default" className="gap-1">
@@ -180,27 +203,113 @@ export default function AccountPage() {
                     </Badge>
                   )}
                 </div>
-                <span className="text-sm text-slate-400 font-medium">@{profile?.username || "bartosz"}</span>
+                <span className="text-sm text-slate-400 font-medium">@{profile?.username}</span>
 
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 mt-3">
+                {/* Metrics */}
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-3">
+                  <div className="px-4 py-2 rounded-xl bg-[#162444]/60 border border-[#182645] text-center">
+                    <span className="text-[11px] text-slate-400">Miejsce w lidze</span>
+                    <div className="text-lg font-extrabold text-white">{userRank ? `#${userRank}` : "-"}</div>
+                  </div>
                   <div className="px-4 py-2 rounded-xl bg-[#162444]/60 border border-[#182645] text-center">
                     <span className="text-[11px] text-slate-400">Punkty</span>
-                    <div className="text-lg font-extrabold text-blue-400">0 pkt</div>
+                    <div className="text-lg font-extrabold text-blue-400">{stats?.totalPoints ?? 0} pkt</div>
                   </div>
                   <div className="px-4 py-2 rounded-xl bg-[#162444]/60 border border-[#182645] text-center">
                     <span className="text-[11px] text-slate-400">Skuteczność</span>
-                    <div className="text-lg font-extrabold text-emerald-400">-</div>
+                    <div className="text-lg font-extrabold text-emerald-400">{stats?.accuracyRate ?? 0}%</div>
                   </div>
                   <div className="px-4 py-2 rounded-xl bg-[#162444]/60 border border-[#182645] text-center">
-                    <span className="text-[11px] text-slate-400">Seria</span>
-                    <div className="text-lg font-extrabold text-amber-400 flex items-center justify-center gap-1">
-                      <span>-</span>
-                      <Flame className="w-4 h-4 fill-amber-400" />
-                    </div>
+                    <span className="text-[11px] text-slate-400">Śr. pkt/mecz</span>
+                    <div className="text-lg font-extrabold text-amber-400">{stats?.averagePointsPerMatch ?? 0}</div>
                   </div>
                 </div>
               </div>
             </div>
+          </Card>
+
+          {/* Detailed Statistics Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+            <Card className="rounded-2xl border-[#182645] bg-[#0c1527] p-4 text-center">
+              <span className="text-xs text-slate-400">Dokładne (3 pkt)</span>
+              <div className="text-xl font-extrabold text-emerald-400 mt-1">{stats?.exactScoresCount ?? 0}</div>
+            </Card>
+            <Card className="rounded-2xl border-[#182645] bg-[#0c1527] p-4 text-center">
+              <span className="text-xs text-slate-400">Różnica / remis (2 pkt)</span>
+              <div className="text-xl font-extrabold text-blue-400 mt-1">{stats?.diffScoresCount ?? 0}</div>
+            </Card>
+            <Card className="rounded-2xl border-[#182645] bg-[#0c1527] p-4 text-center">
+              <span className="text-xs text-slate-400">Rezultat (1 pkt)</span>
+              <div className="text-xl font-extrabold text-indigo-400 mt-1">{stats?.outcomeScoresCount ?? 0}</div>
+            </Card>
+            <Card className="rounded-2xl border-[#182645] bg-[#0c1527] p-4 text-center">
+              <span className="text-xs text-slate-400">Nietrafione (0 pkt)</span>
+              <div className="text-xl font-extrabold text-slate-400 mt-1">{stats?.incorrectScoresCount ?? 0}</div>
+            </Card>
+          </div>
+
+          {/* Predictions History */}
+          <Card className="rounded-3xl border-[#182645] bg-[#0c1527] p-6 shadow-xl">
+            <h2 className="text-lg font-bold text-white mb-4">Twoje obstawione mecze</h2>
+
+            {userMatches.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500 rounded-2xl bg-[#101d36]/40 border border-[#182645]">
+                Nie obstawiłeś jeszcze żadnych meczów. Przejdź do zakładki <a href="/mecze" className="text-blue-400 underline font-semibold">Mecze</a>, aby wytypować wyniki!
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {userMatches.map((match) => {
+                  const pred = match.userPrediction!;
+                  return (
+                    <div
+                      key={match.id}
+                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-[#101d36] border border-[#182645]"
+                    >
+                      {/* Teams */}
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-bold text-white">
+                          {match.homeTeam.shortName} vs {match.awayTeam.shortName}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {match.matchday ? `Kolejka ${match.matchday}` : match.stage}
+                        </span>
+                      </div>
+
+                      {/* Prediction & Score */}
+                      <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-slate-400">Twój typ:</span>
+                          <span className="text-sm font-mono font-extrabold text-white">
+                            {pred.homeScore}:{pred.awayScore}
+                          </span>
+                          {match.homeScore !== null && match.awayScore !== null && (
+                            <span className="text-xs text-slate-500 font-mono">
+                              (Wynik: {match.homeScore}:{match.awayScore})
+                            </span>
+                          )}
+                        </div>
+
+                        {match.status === "finished" && pred.pointsAwarded !== null && (
+                          <Badge
+                            className={`text-xs font-bold ${
+                              pred.pointsAwarded === 3
+                                ? "bg-emerald-950 border-emerald-500 text-emerald-300"
+                                : pred.pointsAwarded === 2
+                                ? "bg-blue-950 border-blue-500 text-blue-300"
+                                : pred.pointsAwarded === 1
+                                ? "bg-indigo-950 border-indigo-500 text-indigo-300"
+                                : "bg-slate-900 border-slate-700 text-slate-400"
+                            }`}
+                          >
+                            +{pred.pointsAwarded} pkt
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </Card>
         </div>
       ) : (
