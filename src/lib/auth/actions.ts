@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -44,11 +45,19 @@ export async function loginWithUsernameAction(
     const adminSupabase = createAdminClient();
     const serverSupabase = await createClient();
 
-    // 1. Atomic Rate Limiting in PostgreSQL
+    // Extract trusted IP on Vercel serverless environment
+    const headerList = await headers();
+    const clientIp =
+      headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      headerList.get("x-real-ip") ||
+      headerList.get("cf-connecting-ip") ||
+      "direct";
+
+    // 1. Atomic Rate Limiting in PostgreSQL with Auto-Cleanup
     const { data: rateLimitResult, error: rateLimitError } = await adminSupabase.rpc(
       "check_and_record_login_attempt",
       {
-        p_ip: "direct",
+        p_ip: clientIp,
         p_username: normalizedUsername,
         p_max_attempts: 5,
         p_window_seconds: 60,
@@ -74,7 +83,7 @@ export async function loginWithUsernameAction(
       return { success: false, error: "Nieprawidłowy login lub hasło." };
     }
 
-    // 3. Verify user active status in profiles
+    // 3. Verify user active status in profiles (Defence in depth)
     const { data: profile, error: profError } = await adminSupabase
       .from("profiles")
       .select("id, is_active")
@@ -277,21 +286,36 @@ export async function changePasswordAction(newPassword: string): Promise<ActionR
 }
 
 /**
- * Server Action: Update Avatar URL (by current user)
+ * Server Action: Update Avatar URL with old file cleanup
  */
-export async function updateAvatarUrlAction(avatarUrl: string): Promise<ActionResult> {
+export async function updateAvatarUrlAction(newAvatarUrl: string): Promise<ActionResult> {
   const currentUser = await getCurrentUserProfile();
   if (!currentUser) return { success: false, error: "Wymagane logowanie." };
 
   try {
     const adminSupabase = createAdminClient();
+    const oldAvatarUrl = currentUser.avatarUrl;
 
+    // 1. Update profiles table with new avatar URL
     const { error } = await adminSupabase
       .from("profiles")
-      .update({ avatar_url: avatarUrl, updated_at: new Date().toISOString() })
+      .update({ avatar_url: newAvatarUrl, updated_at: new Date().toISOString() })
       .eq("id", currentUser.id);
 
     if (error) throw error;
+
+    // 2. Cleanup: delete previous avatar file from storage if present
+    if (oldAvatarUrl && oldAvatarUrl !== newAvatarUrl) {
+      try {
+        const urlParts = oldAvatarUrl.split("/avatars/");
+        if (urlParts.length > 1) {
+          const oldFilePath = decodeURIComponent(urlParts[1]);
+          await adminSupabase.storage.from("avatars").remove([oldFilePath]);
+        }
+      } catch (cleanupErr) {
+        console.warn("Could not delete old avatar file:", cleanupErr);
+      }
+    }
 
     revalidatePath("/konto");
     revalidatePath(`/profil/${currentUser.username}`);
@@ -442,15 +466,6 @@ export async function adminUpdateUserAction(input: z.infer<typeof updateUserSche
       }
     }
 
-    // Immediate session ban / unban in Supabase Auth Admin API
-    if (isActive !== targetProfile.is_active) {
-      if (!isActive) {
-        await adminSupabase.auth.admin.updateUserById(userId, { ban_duration: "876000h" });
-      } else {
-        await adminSupabase.auth.admin.updateUserById(userId, { ban_duration: "none" });
-      }
-    }
-
     // Update profiles
     const { error: updateProfErr } = await adminSupabase
       .from("profiles")
@@ -470,6 +485,19 @@ export async function adminUpdateUserAction(input: z.infer<typeof updateUserSche
       .from("auth_mappings")
       .update({ username: normalizedUsername })
       .eq("user_id", userId);
+
+    // Optional auth ban/unban in Supabase Auth to prevent re-login
+    if (isActive !== targetProfile.is_active) {
+      try {
+        if (!isActive) {
+          await adminSupabase.auth.admin.updateUserById(userId, { ban_duration: "876000h" });
+        } else {
+          await adminSupabase.auth.admin.updateUserById(userId, { ban_duration: "none" });
+        }
+      } catch (banErr) {
+        console.warn("Auth ban/unban notice:", banErr);
+      }
+    }
 
     // Audit log
     await adminSupabase.from("audit_logs").insert({
@@ -589,59 +617,6 @@ export async function adminResetPasswordAction(userId: string, newPassword: stri
   } catch (err) {
     console.error("Error resetting password by admin:", err);
     return { success: false, error: "Wystąpił błąd podczas resetowania hasła." };
-  }
-}
-
-/**
- * Server Action: Admin deletes user (with last admin & league history protection)
- */
-export async function adminDeleteUserAction(userId: string): Promise<ActionResult> {
-  const admin = await requireAdminRole();
-  const adminSupabase = createAdminClient();
-
-  try {
-    const { data: targetProfile, error: fetchErr } = await adminSupabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
-
-    if (fetchErr || !targetProfile) {
-      return { success: false, error: "Nie znaleziono użytkownika." };
-    }
-
-    // Prevent deleting last active admin
-    if (targetProfile.role === "admin") {
-      const { count } = await adminSupabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-        .eq("role", "admin")
-        .eq("is_active", true);
-
-      if (count !== null && count <= 1) {
-        return { success: false, error: "Nie można usunąć ostatniego aktywnego administratora systemu." };
-      }
-    }
-
-    // Record audit log before deletion
-    await adminSupabase.from("audit_logs").insert({
-      actor_id: admin.id,
-      action: "USER_DELETED",
-      target_type: "user",
-      target_id: userId,
-      details: { username: targetProfile.username, firstName: targetProfile.first_name, lastName: targetProfile.last_name },
-    });
-
-    // Delete in sequence
-    await adminSupabase.from("auth_mappings").delete().eq("user_id", userId);
-    await adminSupabase.from("profiles").delete().eq("id", userId);
-    await adminSupabase.auth.admin.deleteUser(userId);
-
-    revalidatePath("/admin");
-    return { success: true };
-  } catch (err) {
-    console.error("Error deleting user by admin:", err);
-    return { success: false, error: "Wystąpił błąd podczas usuwania użytkownika. Zamiast usuwania zalecana jest deaktywacja." };
   }
 }
 

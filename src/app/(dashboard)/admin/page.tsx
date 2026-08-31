@@ -6,8 +6,6 @@ import {
   Users,
   Plus,
   Edit2,
-  Trash2,
-  Lock,
   KeyRound,
   FileText,
   Activity,
@@ -19,7 +17,7 @@ import {
   UserX,
   Search,
 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +27,6 @@ import {
   adminUpdateUserAction,
   adminToggleRoleAction,
   adminResetPasswordAction,
-  adminDeleteUserAction,
   adminGetUsersListAction,
   adminGetAuditLogsAction,
 } from "@/lib/auth/actions";
@@ -55,7 +52,6 @@ export default function AdminPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editUserModal, setEditUserModal] = useState<ProfileRow | null>(null);
   const [resetPwdUser, setResetPwdUser] = useState<ProfileRow | null>(null);
-  const [deleteConfirmUser, setDeleteConfirmUser] = useState<ProfileRow | null>(null);
 
   // Form states for modals
   const [createForm, setCreateForm] = useState({ username: "", firstName: "", lastName: "", password: "", role: "user" as "user" | "admin" });
@@ -114,7 +110,7 @@ export default function AdminPage() {
       if (!res.success) {
         setStatusMessage({ type: "error", text: res.error || "Błąd podczas aktualizacji użytkownika." });
       } else {
-        setStatusMessage({ type: "success", text: "Dane użytkownika zostały zaktualizowane!" });
+        setStatusMessage({ type: "success", text: "Dane użytkownika i status konta zostały zaktualizowane!" });
         setEditUserModal(null);
         loadData();
       }
@@ -149,22 +145,6 @@ export default function AdminPage() {
         setStatusMessage({ type: "success", text: `Nowe hasło dla @${resetPwdUser.username} zostało ustawione!` });
         setResetPwdUser(null);
         setTempPassword("");
-        loadData();
-      }
-    });
-  };
-
-  const handleDeleteUser = () => {
-    if (!deleteConfirmUser) return;
-    setStatusMessage(null);
-
-    startTransition(async () => {
-      const res = await adminDeleteUserAction(deleteConfirmUser.id);
-      if (!res.success) {
-        setStatusMessage({ type: "error", text: res.error || "Błąd podczas usuwania użytkownika." });
-      } else {
-        setStatusMessage({ type: "success", text: `Konto @${deleteConfirmUser.username} zostało trwale usunięte.` });
-        setDeleteConfirmUser(null);
         loadData();
       }
     });
@@ -344,10 +324,10 @@ export default function AdminPage() {
 
                         {/* Actions */}
                         <td className="py-3.5 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                          <div className="flex items-center justify-end gap-2">
                             {/* Edit */}
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
                               onClick={() => {
                                 setEditUserModal(u);
@@ -358,35 +338,26 @@ export default function AdminPage() {
                                   isActive: u.is_active,
                                 });
                               }}
-                              className="h-8 px-2 text-slate-300 hover:text-white"
-                              title="Edytuj dane"
+                              className="h-8 px-2.5 text-xs text-slate-300 hover:text-white"
+                              title="Edytuj dane i status aktywności"
                             >
-                              <Edit2 className="w-3.5 h-3.5" />
+                              <Edit2 className="w-3.5 h-3.5 mr-1" />
+                              Edytuj
                             </Button>
 
                             {/* Reset Password */}
                             <Button
-                              variant="ghost"
+                              variant="outline"
                               size="sm"
                               onClick={() => {
                                 setResetPwdUser(u);
                                 setTempPassword("");
                               }}
-                              className="h-8 px-2 text-amber-400 hover:text-amber-300"
+                              className="h-8 px-2.5 text-xs text-amber-400 hover:text-amber-300 border-amber-500/30"
                               title="Resetuj hasło"
                             >
-                              <KeyRound className="w-3.5 h-3.5" />
-                            </Button>
-
-                            {/* Delete / Danger */}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeleteConfirmUser(u)}
-                              className="h-8 px-2 text-red-400 hover:text-red-300 hover:bg-red-950/30"
-                              title="Usuń konto"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <KeyRound className="w-3.5 h-3.5 mr-1" />
+                              Hasło
                             </Button>
                           </div>
                         </td>
@@ -588,7 +559,7 @@ export default function AdminPage() {
                   className="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700"
                 />
                 <label htmlFor="active-check" className="text-xs font-semibold text-white cursor-pointer">
-                  Konto aktywne (odznaczenie natychmiast blokuje sesję i logowanie)
+                  Konto aktywne (odznaczenie natychmiast wyklucza z typowania i blokuje sesję)
                 </label>
               </div>
 
@@ -635,33 +606,6 @@ export default function AdminPage() {
                 </Button>
               </div>
             </form>
-          </Card>
-        </div>
-      )}
-
-      {/* MODAL: DELETE CONFIRMATION */}
-      {deleteConfirmUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <Card className="w-full max-w-md bg-[#0c1527] border-red-500/40 p-6 rounded-3xl shadow-2xl">
-            <CardTitle className="text-lg font-bold text-red-400 mb-2 flex items-center gap-2">
-              <AlertCircle className="w-5 h-5" />
-              <span>Trwałe usunięcie konta</span>
-            </CardTitle>
-            <p className="text-xs text-slate-300 leading-relaxed mb-4">
-              Czy na pewno chcesz trwale usunąć konto użytkownika <strong>@{deleteConfirmUser.username}</strong> ({deleteConfirmUser.first_name} {deleteConfirmUser.last_name})?
-            </p>
-            <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-amber-300 text-xs mb-6">
-              ⚠️ <strong>Zalecenie:</strong> Aby zachować historię ligi i typów, zamiast usuwania zaleca się <strong>deaktywację konta</strong> w oknie edycji.
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#182645]">
-              <Button type="button" variant="outline" size="sm" onClick={() => setDeleteConfirmUser(null)}>
-                Anuluj
-              </Button>
-              <Button type="button" size="sm" onClick={handleDeleteUser} disabled={isPending} className="bg-red-600 hover:bg-red-500">
-                Potwierdź usunięcie
-              </Button>
-            </div>
           </Card>
         </div>
       )}

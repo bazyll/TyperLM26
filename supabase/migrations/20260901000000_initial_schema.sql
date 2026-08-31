@@ -54,7 +54,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
--- Helper function to verify active user status
+-- Helper function to verify active user status (Used in RLS for IMMEDIATE session blocking)
 CREATE OR REPLACE FUNCTION public.is_active_user()
 RETURNS BOOLEAN AS $$
 BEGIN
@@ -69,7 +69,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 CREATE OR REPLACE FUNCTION public.check_profile_update_permissions()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- If not executed by admin, prevent modifying protected fields
+  -- If not executed by active admin, prevent modifying protected fields
   IF NOT (SELECT public.is_admin()) THEN
     IF NEW.role <> OLD.role OR
        NEW.first_name <> OLD.first_name OR
@@ -179,7 +179,7 @@ FOR EACH ROW
 EXECUTE FUNCTION public.set_updated_at();
 
 -- ============================================================================
--- 8. Predictions Table (Score predictions)
+-- 8. Predictions Table (Score predictions) - Preserves League History
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.predictions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -315,7 +315,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON public.audit_logs(created_at DES
 CREATE INDEX IF NOT EXISTS idx_audit_actor ON public.audit_logs(actor_id);
 
 -- ============================================================================
--- 13. Serverless Persistent Atomic Rate Limiting (Vercel Compatible)
+-- 13. Serverless Persistent Atomic Rate Limiting (With Auto-Cleanup)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.login_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -327,7 +327,7 @@ CREATE TABLE IF NOT EXISTS public.login_attempts (
 CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON public.login_attempts(ip_address, attempted_at DESC);
 CREATE INDEX IF NOT EXISTS idx_login_attempts_user ON public.login_attempts(username, attempted_at DESC);
 
--- Atomic check and record in PostgreSQL (prevents race condition & account lock attacks)
+-- Atomic check, record and auto-cleanup in PostgreSQL
 CREATE OR REPLACE FUNCTION public.check_and_record_login_attempt(
   p_ip TEXT,
   p_username TEXT,
@@ -345,7 +345,11 @@ DECLARE
   v_remaining INT := 0;
   v_cutoff TIMESTAMPTZ := now() - (p_window_seconds || ' seconds')::INTERVAL;
 BEGIN
-  -- Count failed attempts for username
+  -- 1. Automatic periodic cleanup of obsolete records older than 1 hour
+  DELETE FROM public.login_attempts
+  WHERE attempted_at < (now() - INTERVAL '1 hour');
+
+  -- 2. Count failed attempts for username
   IF p_username IS NOT NULL AND p_username <> '' THEN
     SELECT COUNT(*), MIN(attempted_at)
     INTO v_count_user, v_oldest
@@ -354,7 +358,7 @@ BEGIN
       AND attempted_at > v_cutoff;
   END IF;
 
-  -- Count failed attempts for IP
+  -- 3. Count failed attempts for IP
   IF p_ip IS NOT NULL AND p_ip <> '' THEN
     SELECT COUNT(*)
     INTO v_count_ip
@@ -363,8 +367,8 @@ BEGIN
       AND attempted_at > v_cutoff;
   END IF;
 
-  -- If exceeded limit
-  IF v_count_user >= p_max_attempts OR v_count_ip >= (p_max_attempts * 3) THEN
+  -- 4. Check if limit exceeded
+  IF v_count_user >= p_max_attempts OR (p_ip IS NOT NULL AND p_ip <> '' AND v_count_ip >= (p_max_attempts * 3)) THEN
     v_remaining := GREATEST(1, EXTRACT(EPOCH FROM ((COALESCE(v_oldest, now()) + (p_window_seconds || ' seconds')::INTERVAL) - now()))::INT);
     RETURN QUERY SELECT FALSE, v_remaining;
   ELSE
@@ -378,7 +382,7 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================================
--- 14. Row Level Security (RLS) Configuration
+-- 14. Row Level Security (RLS) Configuration (With is_active_user checks)
 -- ============================================================================
 
 -- Enable RLS on all tables
@@ -456,9 +460,8 @@ USING (public.is_admin())
 WITH CHECK (public.is_admin());
 
 -- ----------------------------------------------------------------------------
--- PREDICTIONS POLICIES (Kickoff & Active User Protection)
+-- PREDICTIONS POLICIES (Immediate is_active_user & Kickoff Enforcement)
 -- ----------------------------------------------------------------------------
--- SELECT: Own predictions always, others only when kickoff_at <= now()
 CREATE POLICY "predictions_select_policy"
 ON public.predictions FOR SELECT
 TO authenticated
@@ -472,7 +475,6 @@ USING (
   )
 );
 
--- INSERT: Only active user, only own prediction, strictly before kickoff
 CREATE POLICY "predictions_insert_policy"
 ON public.predictions FOR INSERT
 TO authenticated
@@ -486,7 +488,6 @@ WITH CHECK (
   )
 );
 
--- UPDATE: Only active user, only own prediction, strictly before kickoff
 CREATE POLICY "predictions_update_policy"
 ON public.predictions FOR UPDATE
 TO authenticated
@@ -705,9 +706,8 @@ USING (public.is_admin())
 WITH CHECK (public.is_admin());
 
 -- ============================================================================
--- 15. Storage Configuration (Avatars Bucket)
+-- 15. Storage Configuration (Avatars Bucket with Storage RLS & is_active_user)
 -- ============================================================================
--- Create avatars bucket with 2MB limit and allowed MIME types if storage schema is available
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'buckets') THEN
@@ -717,5 +717,61 @@ BEGIN
       public = false,
       file_size_limit = 2097152,
       allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp'];
+  END IF;
+END $$;
+
+-- Storage RLS on storage.objects (if table exists)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'objects') THEN
+    -- Enable RLS
+    ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+    -- SELECT: authenticated users can read avatars
+    DROP POLICY IF EXISTS "storage_avatars_select" ON storage.objects;
+    CREATE POLICY "storage_avatars_select"
+    ON storage.objects FOR SELECT
+    TO authenticated
+    USING (bucket_id = 'avatars');
+
+    -- INSERT: only active owner can insert into their own folder
+    DROP POLICY IF EXISTS "storage_avatars_insert" ON storage.objects;
+    CREATE POLICY "storage_avatars_insert"
+    ON storage.objects FOR INSERT
+    TO authenticated
+    WITH CHECK (
+      bucket_id = 'avatars'
+      AND (storage.foldername(name))[1] = auth.uid()::text
+      AND public.is_active_user()
+    );
+
+    -- UPDATE: only active owner can update their own folder
+    DROP POLICY IF EXISTS "storage_avatars_update" ON storage.objects;
+    CREATE POLICY "storage_avatars_update"
+    ON storage.objects FOR UPDATE
+    TO authenticated
+    USING (
+      bucket_id = 'avatars'
+      AND (storage.foldername(name))[1] = auth.uid()::text
+      AND public.is_active_user()
+    )
+    WITH CHECK (
+      bucket_id = 'avatars'
+      AND (storage.foldername(name))[1] = auth.uid()::text
+      AND public.is_active_user()
+    );
+
+    -- DELETE: only active owner or admin can delete
+    DROP POLICY IF EXISTS "storage_avatars_delete" ON storage.objects;
+    CREATE POLICY "storage_avatars_delete"
+    ON storage.objects FOR DELETE
+    TO authenticated
+    USING (
+      bucket_id = 'avatars'
+      AND (
+        ((storage.foldername(name))[1] = auth.uid()::text AND public.is_active_user())
+        OR public.is_admin()
+      )
+    );
   END IF;
 END $$;
