@@ -8,21 +8,19 @@ import { Database } from "@/types/database.types";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 
-// In-memory rate limiting map for login attempts (IP / Username -> attempts & lockout)
-const loginAttemptsMap = new Map<string, { count: number; lockedUntil: number }>();
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 60 * 1000; // 1 minute lockout
-
 export interface LoginActionResult {
   success: boolean;
   error?: string;
 }
 
+const MAX_ATTEMPTS = 5;
+const WINDOW_SECONDS = 60;
+
 /**
  * Server Action: Login with Username and Password.
  *
- * Implements:
- * - Rate limiting
+ * Fully compatible with Vercel Serverless Functions:
+ * - Persistent rate limiting backed by Supabase PostgreSQL (login_attempts table)
  * - Case-insensitive username normalization
  * - Lookup of internal Supabase Auth email from profiles
  * - signInWithPassword via Supabase Auth
@@ -40,28 +38,27 @@ export async function loginWithUsernameAction(
   }
 
   const normalizedUsername = username.toLowerCase();
-  const now = Date.now();
-
-  // 1. Rate Limiting Check
-  const attemptRecord = loginAttemptsMap.get(normalizedUsername);
-  if (attemptRecord) {
-    if (attemptRecord.lockedUntil > now) {
-      const waitSeconds = Math.ceil((attemptRecord.lockedUntil - now) / 1000);
-      return {
-        success: false,
-        error: `Zbyt wiele nieudanych prób logowania. Odczekaj ${waitSeconds}s przed kolejną próbą.`,
-      };
-    }
-    if (attemptRecord.lockedUntil <= now && attemptRecord.lockedUntil > 0) {
-      loginAttemptsMap.delete(normalizedUsername);
-    }
-  }
 
   try {
     const adminSupabase = createAdminClient();
     const serverSupabase = await createClient();
 
-    // 2. Lookup profile by case-insensitive username using admin client (bypasses unauthenticated RLS for auth_email)
+    // 1. Persistent Rate Limiting Check (Serverless & multi-instance safe in PostgreSQL)
+    const windowStart = new Date(Date.now() - WINDOW_SECONDS * 1000).toISOString();
+    const { count: attemptCount, error: countError } = await adminSupabase
+      .from("login_attempts")
+      .select("*", { count: "exact", head: true })
+      .eq("identifier", normalizedUsername)
+      .gte("attempted_at", windowStart);
+
+    if (!countError && attemptCount !== null && attemptCount >= MAX_ATTEMPTS) {
+      return {
+        success: false,
+        error: `Zbyt wiele nieudanych prób logowania. Odczekaj chwilę przed kolejną próbą.`,
+      };
+    }
+
+    // 2. Lookup profile by case-insensitive username using admin client
     const { data, error: profileError } = await adminSupabase
       .from("profiles")
       .select("*")
@@ -71,7 +68,8 @@ export async function loginWithUsernameAction(
     const profile = data as ProfileRow | null;
 
     if (profileError || !profile || !profile.is_active) {
-      recordFailedAttempt(normalizedUsername);
+      // Record failed attempt in persistent database table
+      await adminSupabase.from("login_attempts").insert({ identifier: normalizedUsername });
       return { success: false, error: "Nieprawidłowy login lub hasło." };
     }
 
@@ -82,12 +80,16 @@ export async function loginWithUsernameAction(
     });
 
     if (authError) {
-      recordFailedAttempt(normalizedUsername);
+      // Record failed attempt in persistent database table
+      await adminSupabase.from("login_attempts").insert({ identifier: normalizedUsername });
       return { success: false, error: "Nieprawidłowy login lub hasło." };
     }
 
-    // Success: clear rate limit counter
-    loginAttemptsMap.delete(normalizedUsername);
+    // Success: clean up old attempts for this user identifier
+    await adminSupabase
+      .from("login_attempts")
+      .delete()
+      .eq("identifier", normalizedUsername);
   } catch (err) {
     console.error("Login unexpected error:", err);
     return { success: false, error: "Nieprawidłowy login lub hasło." };
@@ -95,15 +97,6 @@ export async function loginWithUsernameAction(
 
   // Redirect to dashboard on successful login
   redirect("/");
-}
-
-function recordFailedAttempt(key: string) {
-  const record = loginAttemptsMap.get(key) || { count: 0, lockedUntil: 0 };
-  record.count += 1;
-  if (record.count >= MAX_ATTEMPTS) {
-    record.lockedUntil = Date.now() + LOCKOUT_MS;
-  }
-  loginAttemptsMap.set(key, record);
 }
 
 /**

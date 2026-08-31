@@ -442,6 +442,24 @@ export interface Database {
         };
         Relationships: [];
       };
+      login_attempts: {
+        Row: {
+          id: string;
+          identifier: string;
+          attempted_at: string;
+        };
+        Insert: {
+          id?: string;
+          identifier: string;
+          attempted_at?: string;
+        };
+        Update: {
+          id?: string;
+          identifier?: string;
+          attempted_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -450,6 +468,17 @@ export interface Database {
       is_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      record_and_check_login_attempt: {
+        Args: {
+          p_identifier: string;
+          p_max_attempts?: number;
+          p_window_seconds?: number;
+        };
+        Returns: {
+          is_allowed: boolean;
+          remaining_seconds: number;
+        }[];
       };
     };
     Enums: {

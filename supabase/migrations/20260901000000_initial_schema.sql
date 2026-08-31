@@ -11,6 +11,7 @@ DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
 DROP FUNCTION IF EXISTS public.check_profile_update_permissions() CASCADE;
 DROP FUNCTION IF EXISTS public.check_prediction_update_permissions() CASCADE;
 DROP FUNCTION IF EXISTS public.set_updated_at() CASCADE;
+DROP FUNCTION IF EXISTS public.record_and_check_login_attempt(TEXT, INT, INT) CASCADE;
 
 -- 3. Helper trigger for updated_at
 CREATE OR REPLACE FUNCTION public.set_updated_at()
@@ -111,7 +112,7 @@ CREATE TABLE IF NOT EXISTS public.matches (
   matchday INT,
   stage TEXT NOT NULL DEFAULT 'league' CHECK (stage IN ('league', 'playoff', 'round_of_16', 'quarter_finals', 'semi_finals', 'final')),
   home_team_id UUID NOT NULL REFERENCES public.teams(id) ON DELETE RESTRICT,
-  away_team_id UUID NOT NULL REFERENCES public.teams(id) ON DELETE RESTRICT,
+  away_team_id UUID NOT NULL REFERENCES teams(id) ON DELETE RESTRICT,
   kickoff_at TIMESTAMPTZ NOT NULL,
   status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'live', 'finished', 'postponed', 'cancelled')),
   home_score INT CHECK (home_score >= 0),
@@ -268,7 +269,62 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON public.audit_logs(created_at DES
 CREATE INDEX IF NOT EXISTS idx_audit_actor ON public.audit_logs(actor_id);
 
 -- ============================================================================
--- 13. Row Level Security (RLS) Configuration
+-- 13. Serverless Persistent Rate Limiting (Vercel / Edge Compatible)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.login_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  identifier TEXT NOT NULL,
+  attempted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_attempts ON public.login_attempts(identifier, attempted_at DESC);
+
+-- Function to check rate limit and record failed attempt atomically in PostgreSQL
+CREATE OR REPLACE FUNCTION public.record_and_check_login_attempt(
+  p_identifier TEXT,
+  p_max_attempts INT DEFAULT 5,
+  p_window_seconds INT DEFAULT 60
+)
+RETURNS TABLE (
+  is_allowed BOOLEAN,
+  remaining_seconds INT
+) AS $$
+DECLARE
+  v_count INT;
+  v_oldest TIMESTAMPTZ;
+  v_remaining INT;
+BEGIN
+  -- Count failed attempts in the given window
+  SELECT COUNT(*), MIN(attempted_at)
+  INTO v_count, v_oldest
+  FROM public.login_attempts
+  WHERE identifier = p_identifier
+    AND attempted_at > (now() - (p_window_seconds || ' seconds')::INTERVAL);
+
+  IF v_count >= p_max_attempts THEN
+    v_remaining := GREATEST(1, EXTRACT(EPOCH FROM ((v_oldest + (p_window_seconds || ' seconds')::INTERVAL) - now()))::INT);
+    RETURN QUERY SELECT FALSE, v_remaining;
+  ELSE
+    -- Record this attempt
+    INSERT INTO public.login_attempts (identifier, attempted_at)
+    VALUES (p_identifier, now());
+
+    RETURN QUERY SELECT TRUE, 0;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Cleanup function for old rate limit logs (can be run periodically or by cron)
+CREATE OR REPLACE FUNCTION public.cleanup_old_login_attempts()
+RETURNS VOID AS $$
+BEGIN
+  DELETE FROM public.login_attempts
+  WHERE attempted_at < (now() - INTERVAL '1 day');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ============================================================================
+-- 14. Row Level Security (RLS) Configuration
 -- ============================================================================
 
 -- Enable RLS on all tables
@@ -284,6 +340,7 @@ ALTER TABLE public.pickem_submissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.announcement_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.login_attempts ENABLE ROW LEVEL SECURITY;
 
 -- ----------------------------------------------------------------------------
 -- PROFILES POLICIES
@@ -576,4 +633,11 @@ ON public.audit_logs FOR INSERT
 TO authenticated
 WITH CHECK (public.is_admin() OR auth.uid() = actor_id);
 
--- Note: No UPDATE or DELETE policies created for audit_logs (Strict Append-Only).
+-- ----------------------------------------------------------------------------
+-- LOGIN ATTEMPTS (Server-Only Security)
+-- ----------------------------------------------------------------------------
+CREATE POLICY "login_attempts_admin_all"
+ON public.login_attempts FOR ALL
+TO authenticated
+USING (public.is_admin())
+WITH CHECK (public.is_admin());
