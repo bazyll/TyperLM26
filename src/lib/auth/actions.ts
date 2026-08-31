@@ -45,13 +45,13 @@ export async function loginWithUsernameAction(
     const adminSupabase = createAdminClient();
     const serverSupabase = await createClient();
 
-    // Extract trusted IP on Vercel serverless environment
+    // Extract trusted IP on Vercel infrastructure (x-vercel-forwarded-for) with local fallback
     const headerList = await headers();
     const clientIp =
+      headerList.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
       headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       headerList.get("x-real-ip") ||
-      headerList.get("cf-connecting-ip") ||
-      "direct";
+      "127.0.0.1";
 
     // 1. Atomic Rate Limiting in PostgreSQL with Auto-Cleanup
     const { data: rateLimitResult, error: rateLimitError } = await adminSupabase.rpc(
