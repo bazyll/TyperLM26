@@ -19,7 +19,6 @@ export interface Database {
       profiles: {
         Row: {
           id: string;
-          auth_email: string;
           username: string;
           first_name: string;
           last_name: string;
@@ -31,7 +30,6 @@ export interface Database {
         };
         Insert: {
           id: string;
-          auth_email: string;
           username: string;
           first_name: string;
           last_name: string;
@@ -43,7 +41,6 @@ export interface Database {
         };
         Update: {
           id?: string;
-          auth_email?: string;
           username?: string;
           first_name?: string;
           last_name?: string;
@@ -52,6 +49,30 @@ export interface Database {
           is_active?: boolean;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      auth_mappings: {
+        Row: {
+          id: string;
+          user_id: string;
+          username: string;
+          auth_email: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          username: string;
+          auth_email: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          username?: string;
+          auth_email?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -358,7 +379,7 @@ export interface Database {
       announcements: {
         Row: {
           id: string;
-          author_id: string;
+          author_id: string | null;
           title: string;
           content: string;
           is_pinned: boolean;
@@ -367,7 +388,7 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          author_id: string;
+          author_id?: string | null;
           title: string;
           content: string;
           is_pinned?: boolean;
@@ -376,7 +397,7 @@ export interface Database {
         };
         Update: {
           id?: string;
-          author_id?: string;
+          author_id?: string | null;
           title?: string;
           content?: string;
           is_pinned?: boolean;
@@ -389,7 +410,7 @@ export interface Database {
         Row: {
           id: string;
           announcement_id: string;
-          user_id: string;
+          user_id: string | null;
           content: string;
           created_at: string;
           updated_at: string;
@@ -397,7 +418,7 @@ export interface Database {
         Insert: {
           id?: string;
           announcement_id: string;
-          user_id: string;
+          user_id?: string | null;
           content: string;
           created_at?: string;
           updated_at?: string;
@@ -405,7 +426,7 @@ export interface Database {
         Update: {
           id?: string;
           announcement_id?: string;
-          user_id?: string;
+          user_id?: string | null;
           content?: string;
           created_at?: string;
           updated_at?: string;
@@ -445,17 +466,20 @@ export interface Database {
       login_attempts: {
         Row: {
           id: string;
-          identifier: string;
+          ip_address: string | null;
+          username: string | null;
           attempted_at: string;
         };
         Insert: {
           id?: string;
-          identifier: string;
+          ip_address?: string | null;
+          username?: string | null;
           attempted_at?: string;
         };
         Update: {
           id?: string;
-          identifier?: string;
+          ip_address?: string | null;
+          username?: string | null;
           attempted_at?: string;
         };
         Relationships: [];
@@ -469,9 +493,14 @@ export interface Database {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
-      record_and_check_login_attempt: {
+      is_active_user: {
+        Args: Record<PropertyKey, never>;
+        Returns: boolean;
+      };
+      check_and_record_login_attempt: {
         Args: {
-          p_identifier: string;
+          p_ip: string;
+          p_username: string;
           p_max_attempts?: number;
           p_window_seconds?: number;
         };

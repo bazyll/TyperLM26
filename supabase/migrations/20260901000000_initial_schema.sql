@@ -1,5 +1,5 @@
 -- ============================================================================
--- TyperLM26: Initial PostgreSQL Database Schema Migration (2026/2027 Season)
+-- TyperLM26: PostgreSQL Database Schema Migration (UEFA Champions League 2026/2027)
 -- ============================================================================
 
 -- 1. Enable Required Extensions
@@ -8,10 +8,12 @@ CREATE EXTENSION IF NOT EXISTS "citext";
 
 -- 2. Drop existing triggers & functions if present (for clean idempotency)
 DROP FUNCTION IF EXISTS public.is_admin() CASCADE;
+DROP FUNCTION IF EXISTS public.is_active_user() CASCADE;
 DROP FUNCTION IF EXISTS public.check_profile_update_permissions() CASCADE;
 DROP FUNCTION IF EXISTS public.check_prediction_update_permissions() CASCADE;
+DROP FUNCTION IF EXISTS public.sync_profile_username_to_auth_mappings() CASCADE;
 DROP FUNCTION IF EXISTS public.set_updated_at() CASCADE;
-DROP FUNCTION IF EXISTS public.record_and_check_login_attempt(TEXT, INT, INT) CASCADE;
+DROP FUNCTION IF EXISTS public.check_and_record_login_attempt(TEXT, TEXT, INT, INT) CASCADE;
 
 -- 3. Helper trigger for updated_at
 CREATE OR REPLACE FUNCTION public.set_updated_at()
@@ -23,11 +25,10 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================================
--- 4. Profiles Table (Linked with auth.users)
+-- 4. Profiles Table (Public Profile Data Linked with auth.users)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.profiles (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  auth_email TEXT NOT NULL UNIQUE,
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE RESTRICT,
   username CITEXT NOT NULL UNIQUE,
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
@@ -40,14 +41,26 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 CREATE INDEX IF NOT EXISTS idx_profiles_username ON public.profiles(username);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON public.profiles(role);
+CREATE INDEX IF NOT EXISTS idx_profiles_active ON public.profiles(is_active);
 
--- Helper function to verify admin status
+-- Helper function to verify active admin status
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid() AND role = 'admin' AND is_active = TRUE
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
+
+-- Helper function to verify active user status
+CREATE OR REPLACE FUNCTION public.is_active_user()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND is_active = TRUE
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
@@ -61,9 +74,8 @@ BEGIN
     IF NEW.role <> OLD.role OR
        NEW.first_name <> OLD.first_name OR
        NEW.last_name <> OLD.last_name OR
-       NEW.auth_email <> OLD.auth_email OR
        NEW.is_active <> OLD.is_active THEN
-      RAISE EXCEPTION 'Unauthorized: cannot update protected profile fields (role, name, status, email)';
+      RAISE EXCEPTION 'Unauthorized: cannot update protected profile fields (role, name, status)';
     END IF;
   END IF;
   NEW.updated_at = now();
@@ -77,7 +89,44 @@ FOR EACH ROW
 EXECUTE FUNCTION public.check_profile_update_permissions();
 
 -- ============================================================================
--- 5. Teams Table
+-- 5. Private Auth Mappings (Defence in Depth - Internal Auth Mapping)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.auth_mappings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+  username CITEXT NOT NULL UNIQUE,
+  auth_email TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_mappings_username ON public.auth_mappings(username);
+CREATE INDEX IF NOT EXISTS idx_auth_mappings_user_id ON public.auth_mappings(user_id);
+
+-- Explicitly revoke access for anon and authenticated users
+ALTER TABLE public.auth_mappings ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.auth_mappings FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.auth_mappings TO service_role;
+
+-- Trigger to keep auth_mappings.username in sync with profiles.username atomically
+CREATE OR REPLACE FUNCTION public.sync_profile_username_to_auth_mappings()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.username <> OLD.username THEN
+    UPDATE public.auth_mappings
+    SET username = NEW.username
+    WHERE user_id = NEW.id;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER trg_sync_profile_username
+AFTER UPDATE ON public.profiles
+FOR EACH ROW
+EXECUTE FUNCTION public.sync_profile_username_to_auth_mappings();
+
+-- ============================================================================
+-- 6. Teams & Players Tables
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.teams (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -92,9 +141,6 @@ CREATE TABLE IF NOT EXISTS public.teams (
 
 CREATE INDEX IF NOT EXISTS idx_teams_code ON public.teams(code);
 
--- ============================================================================
--- 6. Players Table (For Top Scorer / Top Assists Special Predictions)
--- ============================================================================
 CREATE TABLE IF NOT EXISTS public.players (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
@@ -112,7 +158,7 @@ CREATE TABLE IF NOT EXISTS public.matches (
   matchday INT,
   stage TEXT NOT NULL DEFAULT 'league' CHECK (stage IN ('league', 'playoff', 'round_of_16', 'quarter_finals', 'semi_finals', 'final')),
   home_team_id UUID NOT NULL REFERENCES public.teams(id) ON DELETE RESTRICT,
-  away_team_id UUID NOT NULL REFERENCES teams(id) ON DELETE RESTRICT,
+  away_team_id UUID NOT NULL REFERENCES public.teams(id) ON DELETE RESTRICT,
   kickoff_at TIMESTAMPTZ NOT NULL,
   status TEXT NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled', 'live', 'finished', 'postponed', 'cancelled')),
   home_score INT CHECK (home_score >= 0),
@@ -137,7 +183,7 @@ EXECUTE FUNCTION public.set_updated_at();
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.predictions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
   match_id UUID NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
   home_score INT NOT NULL CHECK (home_score >= 0 AND home_score <= 99),
   away_score INT NOT NULL CHECK (away_score >= 0 AND away_score <= 99),
@@ -191,7 +237,7 @@ CREATE TABLE IF NOT EXISTS public.special_prediction_categories (
 
 CREATE TABLE IF NOT EXISTS public.special_predictions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
   category_id UUID NOT NULL REFERENCES public.special_prediction_categories(id) ON DELETE CASCADE,
   selected_team_id UUID REFERENCES public.teams(id),
   selected_player_id UUID REFERENCES public.players(id),
@@ -217,7 +263,7 @@ CREATE TABLE IF NOT EXISTS public.pickem_config (
 
 CREATE TABLE IF NOT EXISTS public.pickem_submissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE UNIQUE,
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT UNIQUE,
   first_team_id UUID NOT NULL REFERENCES public.teams(id),
   top8_team_ids UUID[] NOT NULL,
   out_team_ids UUID[] NOT NULL,
@@ -233,7 +279,7 @@ CREATE INDEX IF NOT EXISTS idx_pickem_user ON public.pickem_submissions(user_id)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.announcements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  author_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  author_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE SET NULL,
   title VARCHAR(200) NOT NULL,
   content TEXT NOT NULL,
   is_pinned BOOLEAN NOT NULL DEFAULT FALSE,
@@ -244,7 +290,7 @@ CREATE TABLE IF NOT EXISTS public.announcements (
 CREATE TABLE IF NOT EXISTS public.announcement_comments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   announcement_id UUID NOT NULL REFERENCES public.announcements(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE SET NULL,
   content VARCHAR(2000) NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -269,19 +315,22 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON public.audit_logs(created_at DES
 CREATE INDEX IF NOT EXISTS idx_audit_actor ON public.audit_logs(actor_id);
 
 -- ============================================================================
--- 13. Serverless Persistent Rate Limiting (Vercel / Edge Compatible)
+-- 13. Serverless Persistent Atomic Rate Limiting (Vercel Compatible)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.login_attempts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  identifier TEXT NOT NULL,
+  ip_address TEXT,
+  username CITEXT,
   attempted_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_login_attempts ON public.login_attempts(identifier, attempted_at DESC);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip ON public.login_attempts(ip_address, attempted_at DESC);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_user ON public.login_attempts(username, attempted_at DESC);
 
--- Function to check rate limit and record failed attempt atomically in PostgreSQL
-CREATE OR REPLACE FUNCTION public.record_and_check_login_attempt(
-  p_identifier TEXT,
+-- Atomic check and record in PostgreSQL (prevents race condition & account lock attacks)
+CREATE OR REPLACE FUNCTION public.check_and_record_login_attempt(
+  p_ip TEXT,
+  p_username TEXT,
   p_max_attempts INT DEFAULT 5,
   p_window_seconds INT DEFAULT 60
 )
@@ -290,36 +339,41 @@ RETURNS TABLE (
   remaining_seconds INT
 ) AS $$
 DECLARE
-  v_count INT;
+  v_count_user INT := 0;
+  v_count_ip INT := 0;
   v_oldest TIMESTAMPTZ;
-  v_remaining INT;
+  v_remaining INT := 0;
+  v_cutoff TIMESTAMPTZ := now() - (p_window_seconds || ' seconds')::INTERVAL;
 BEGIN
-  -- Count failed attempts in the given window
-  SELECT COUNT(*), MIN(attempted_at)
-  INTO v_count, v_oldest
-  FROM public.login_attempts
-  WHERE identifier = p_identifier
-    AND attempted_at > (now() - (p_window_seconds || ' seconds')::INTERVAL);
+  -- Count failed attempts for username
+  IF p_username IS NOT NULL AND p_username <> '' THEN
+    SELECT COUNT(*), MIN(attempted_at)
+    INTO v_count_user, v_oldest
+    FROM public.login_attempts
+    WHERE username = p_username::citext
+      AND attempted_at > v_cutoff;
+  END IF;
 
-  IF v_count >= p_max_attempts THEN
-    v_remaining := GREATEST(1, EXTRACT(EPOCH FROM ((v_oldest + (p_window_seconds || ' seconds')::INTERVAL) - now()))::INT);
+  -- Count failed attempts for IP
+  IF p_ip IS NOT NULL AND p_ip <> '' THEN
+    SELECT COUNT(*)
+    INTO v_count_ip
+    FROM public.login_attempts
+    WHERE ip_address = p_ip
+      AND attempted_at > v_cutoff;
+  END IF;
+
+  -- If exceeded limit
+  IF v_count_user >= p_max_attempts OR v_count_ip >= (p_max_attempts * 3) THEN
+    v_remaining := GREATEST(1, EXTRACT(EPOCH FROM ((COALESCE(v_oldest, now()) + (p_window_seconds || ' seconds')::INTERVAL) - now()))::INT);
     RETURN QUERY SELECT FALSE, v_remaining;
   ELSE
-    -- Record this attempt
-    INSERT INTO public.login_attempts (identifier, attempted_at)
-    VALUES (p_identifier, now());
+    -- Record this attempt atomically
+    INSERT INTO public.login_attempts (ip_address, username, attempted_at)
+    VALUES (p_ip, p_username::citext, now());
 
     RETURN QUERY SELECT TRUE, 0;
   END IF;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- Cleanup function for old rate limit logs (can be run periodically or by cron)
-CREATE OR REPLACE FUNCTION public.cleanup_old_login_attempts()
-RETURNS VOID AS $$
-BEGIN
-  DELETE FROM public.login_attempts
-  WHERE attempted_at < (now() - INTERVAL '1 day');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -353,8 +407,8 @@ USING (TRUE);
 CREATE POLICY "profiles_update_own"
 ON public.profiles FOR UPDATE
 TO authenticated
-USING (auth.uid() = id)
-WITH CHECK (auth.uid() = id);
+USING (auth.uid() = id AND public.is_active_user())
+WITH CHECK (auth.uid() = id AND public.is_active_user());
 
 CREATE POLICY "profiles_admin_all"
 ON public.profiles FOR ALL
@@ -363,7 +417,7 @@ USING (public.is_admin())
 WITH CHECK (public.is_admin());
 
 -- ----------------------------------------------------------------------------
--- TEAMS & PLAYERS POLICIES (Read-only for all authenticated, write for admin)
+-- TEAMS & PLAYERS POLICIES
 -- ----------------------------------------------------------------------------
 CREATE POLICY "teams_select_all"
 ON public.teams FOR SELECT
@@ -388,7 +442,7 @@ USING (public.is_admin())
 WITH CHECK (public.is_admin());
 
 -- ----------------------------------------------------------------------------
--- MATCHES POLICIES (Read-only for all authenticated, write for admin)
+-- MATCHES POLICIES
 -- ----------------------------------------------------------------------------
 CREATE POLICY "matches_select_all"
 ON public.matches FOR SELECT
@@ -402,7 +456,7 @@ USING (public.is_admin())
 WITH CHECK (public.is_admin());
 
 -- ----------------------------------------------------------------------------
--- PREDICTIONS POLICIES (Strict Kickoff Protection)
+-- PREDICTIONS POLICIES (Kickoff & Active User Protection)
 -- ----------------------------------------------------------------------------
 -- SELECT: Own predictions always, others only when kickoff_at <= now()
 CREATE POLICY "predictions_select_policy"
@@ -418,12 +472,13 @@ USING (
   )
 );
 
--- INSERT: Only own prediction, only strictly before kickoff (kickoff_at > now())
+-- INSERT: Only active user, only own prediction, strictly before kickoff
 CREATE POLICY "predictions_insert_policy"
 ON public.predictions FOR INSERT
 TO authenticated
 WITH CHECK (
   auth.uid() = user_id
+  AND public.is_active_user()
   AND EXISTS (
     SELECT 1 FROM public.matches
     WHERE matches.id = predictions.match_id
@@ -431,12 +486,13 @@ WITH CHECK (
   )
 );
 
--- UPDATE: Only own prediction, only strictly before kickoff (kickoff_at > now())
+-- UPDATE: Only active user, only own prediction, strictly before kickoff
 CREATE POLICY "predictions_update_policy"
 ON public.predictions FOR UPDATE
 TO authenticated
 USING (
   auth.uid() = user_id
+  AND public.is_active_user()
   AND EXISTS (
     SELECT 1 FROM public.matches
     WHERE matches.id = predictions.match_id
@@ -445,6 +501,7 @@ USING (
 )
 WITH CHECK (
   auth.uid() = user_id
+  AND public.is_active_user()
   AND EXISTS (
     SELECT 1 FROM public.matches
     WHERE matches.id = predictions.match_id
@@ -452,7 +509,6 @@ WITH CHECK (
   )
 );
 
--- ADMIN: Admin can view and manage all predictions if needed
 CREATE POLICY "predictions_admin_all"
 ON public.predictions FOR ALL
 TO authenticated
@@ -460,7 +516,7 @@ USING (public.is_admin())
 WITH CHECK (public.is_admin());
 
 -- ----------------------------------------------------------------------------
--- SPECIAL PREDICTIONS POLICIES (Strict Deadline Protection)
+-- SPECIAL PREDICTIONS POLICIES
 -- ----------------------------------------------------------------------------
 CREATE POLICY "spec_categories_select_all"
 ON public.special_prediction_categories FOR SELECT
@@ -491,6 +547,7 @@ ON public.special_predictions FOR INSERT
 TO authenticated
 WITH CHECK (
   auth.uid() = user_id
+  AND public.is_active_user()
   AND EXISTS (
     SELECT 1 FROM public.special_prediction_categories
     WHERE special_prediction_categories.id = special_predictions.category_id
@@ -503,6 +560,7 @@ ON public.special_predictions FOR UPDATE
 TO authenticated
 USING (
   auth.uid() = user_id
+  AND public.is_active_user()
   AND EXISTS (
     SELECT 1 FROM public.special_prediction_categories
     WHERE special_prediction_categories.id = special_predictions.category_id
@@ -511,6 +569,7 @@ USING (
 )
 WITH CHECK (
   auth.uid() = user_id
+  AND public.is_active_user()
   AND EXISTS (
     SELECT 1 FROM public.special_prediction_categories
     WHERE special_prediction_categories.id = special_predictions.category_id
@@ -525,7 +584,7 @@ USING (public.is_admin())
 WITH CHECK (public.is_admin());
 
 -- ----------------------------------------------------------------------------
--- PICK'EM POLICIES (Strict Deadline Protection)
+-- PICK'EM POLICIES
 -- ----------------------------------------------------------------------------
 CREATE POLICY "pickem_config_select_all"
 ON public.pickem_config FOR SELECT
@@ -555,6 +614,7 @@ ON public.pickem_submissions FOR INSERT
 TO authenticated
 WITH CHECK (
   auth.uid() = user_id
+  AND public.is_active_user()
   AND EXISTS (
     SELECT 1 FROM public.pickem_config
     WHERE pickem_config.deadline_at > now()
@@ -566,6 +626,7 @@ ON public.pickem_submissions FOR UPDATE
 TO authenticated
 USING (
   auth.uid() = user_id
+  AND public.is_active_user()
   AND EXISTS (
     SELECT 1 FROM public.pickem_config
     WHERE pickem_config.deadline_at > now()
@@ -573,6 +634,7 @@ USING (
 )
 WITH CHECK (
   auth.uid() = user_id
+  AND public.is_active_user()
   AND EXISTS (
     SELECT 1 FROM public.pickem_config
     WHERE pickem_config.deadline_at > now()
@@ -607,18 +669,18 @@ USING (TRUE);
 CREATE POLICY "comments_insert_own"
 ON public.announcement_comments FOR INSERT
 TO authenticated
-WITH CHECK (auth.uid() = user_id);
+WITH CHECK (auth.uid() = user_id AND public.is_active_user());
 
 CREATE POLICY "comments_update_own"
 ON public.announcement_comments FOR UPDATE
 TO authenticated
-USING (auth.uid() = user_id)
-WITH CHECK (auth.uid() = user_id);
+USING (auth.uid() = user_id AND public.is_active_user())
+WITH CHECK (auth.uid() = user_id AND public.is_active_user());
 
 CREATE POLICY "comments_delete_own"
 ON public.announcement_comments FOR DELETE
 TO authenticated
-USING (auth.uid() = user_id OR public.is_admin());
+USING ((auth.uid() = user_id AND public.is_active_user()) OR public.is_admin());
 
 -- ----------------------------------------------------------------------------
 -- AUDIT LOGS POLICIES (Append-Only, Admin-only read, NO UPDATE / NO DELETE)
@@ -641,3 +703,19 @@ ON public.login_attempts FOR ALL
 TO authenticated
 USING (public.is_admin())
 WITH CHECK (public.is_admin());
+
+-- ============================================================================
+-- 15. Storage Configuration (Avatars Bucket)
+-- ============================================================================
+-- Create avatars bucket with 2MB limit and allowed MIME types if storage schema is available
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'buckets') THEN
+    INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+    VALUES ('avatars', 'avatars', false, 2097152, ARRAY['image/jpeg', 'image/png', 'image/webp'])
+    ON CONFLICT (id) DO UPDATE SET
+      public = false,
+      file_size_limit = 2097152,
+      allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp'];
+  END IF;
+END $$;

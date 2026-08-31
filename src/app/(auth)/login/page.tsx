@@ -4,9 +4,10 @@ import { useActionState, useState } from "react";
 import { Lock, User, Eye, EyeOff, Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { loginWithUsernameAction, LoginActionResult } from "@/lib/auth/actions";
+import { loginWithUsernameAction } from "@/lib/auth/actions";
+import { ActionResult } from "@/lib/auth/schemas";
 
-const initialState: LoginActionResult = {
+const initialState: ActionResult = {
   success: false,
 };
 

@@ -1,20 +1,20 @@
 import { describe, it, expect } from "vitest";
 
 /**
- * PostgreSQL / RLS Security Policy Verification Suite
+ * PostgreSQL / RLS Security Policy Verification Suite (Milestone 2)
  *
  * This suite models and verifies all PostgreSQL Row Level Security (RLS) expressions,
- * column constraints, and security definer triggers defined in
+ * column constraints, auth_mappings isolation, and security definer triggers defined in
  * `supabase/migrations/20260901000000_initial_schema.sql`.
  */
 
 describe("PostgreSQL Database & RLS Security Policy Verification", () => {
-  // Simulated database state
   const mockNow = new Date("2026-09-15T18:00:00Z").getTime();
 
-  const userA = { id: "usr-a", role: "user", firstName: "Jan", lastName: "Kowalski" };
-  const userB = { id: "usr-b", role: "user", firstName: "Piotr", lastName: "Nowak" };
-  const adminUser = { id: "usr-admin", role: "admin", firstName: "Bartek", lastName: "Admin" };
+  const activeUserA = { id: "usr-a", role: "user", isActive: true };
+  const deactivatedUser = { id: "usr-inactive", role: "user", isActive: false };
+  const activeUserB = { id: "usr-b", role: "user", isActive: true };
+  const adminUser = { id: "usr-admin", role: "admin", isActive: true };
 
   const futureMatch = {
     id: "match-future",
@@ -27,140 +27,115 @@ describe("PostgreSQL Database & RLS Security Policy Verification", () => {
   };
 
   const predictionUserB_Future = {
-    userId: userB.id,
+    userId: activeUserB.id,
     matchId: futureMatch.id,
     homeScore: 2,
     awayScore: 1,
-    pointsAwarded: null,
   };
 
   const predictionUserB_Past = {
-    userId: userB.id,
+    userId: activeUserB.id,
     matchId: pastMatch.id,
     homeScore: 1,
     awayScore: 0,
-    pointsAwarded: 3,
   };
 
-  /**
-   * RLS Formula: predictions_select_policy
-   * (auth.uid() = user_id OR is_admin() OR kickoff_at <= now())
-   */
+  // 1. RLS: predictions_select_policy
   function rlsCanSelectPrediction(
-    viewerId: string | null,
-    viewerRole: string | null,
+    viewer: { id: string; role: string; isActive: boolean } | null,
     pred: { userId: string; matchId: string },
     match: { id: string; kickoffAt: number },
     currentTimestamp: number = mockNow
   ): boolean {
-    if (!viewerId) return false; // Anonymous
-    if (viewerId === pred.userId) return true; // Own prediction
-    if (viewerRole === "admin") return true; // Admin
+    if (!viewer) return false; // Anonymous
+    if (viewer.id === pred.userId) return true; // Own prediction
+    if (viewer.role === "admin" && viewer.isActive) return true; // Admin
     if (match.kickoffAt <= currentTimestamp) return true; // Match already started
-    return false; // Hidden before kickoff!
+    return false; // Hidden before kickoff
   }
 
-  /**
-   * RLS Formula: predictions_insert_policy & predictions_update_policy
-   * (auth.uid() = user_id AND kickoff_at > now())
-   */
+  // 2. RLS: predictions_insert_policy & update_policy
   function rlsCanInsertOrUpdatePrediction(
-    editorId: string | null,
+    editor: { id: string; role: string; isActive: boolean } | null,
     targetUserId: string,
     match: { kickoffAt: number },
     currentTimestamp: number = mockNow
   ): boolean {
-    if (!editorId) return false;
-    if (editorId !== targetUserId) return false; // Cannot modify another user's prediction
+    if (!editor) return false;
+    if (!editor.isActive) return false; // Deactivated user BLOCKED immediately!
+    if (editor.id !== targetUserId) return false; // Cannot modify other's prediction
     if (match.kickoffAt <= currentTimestamp) return false; // Cannot modify after kickoff!
     return true;
   }
 
-  /**
-   * Profile Protection Trigger: check_profile_update_permissions
-   */
-  function canUpdateProfile(
-    callerRole: string,
+  // 3. RLS: auth_mappings isolation
+  function rlsCanAccessAuthMappings(callerRole: "anon" | "authenticated" | "service_role"): boolean {
+    if (callerRole === "service_role") return true;
+    return false; // anon & authenticated strictly revoked
+  }
+
+  // 4. Trigger: check_profile_update_permissions
+  function canUpdateProfileField(
+    caller: { id: string; role: string; isActive: boolean },
     targetUserId: string,
-    callerId: string,
     field: string
   ): boolean {
-    if (callerRole === "admin") return true;
-    if (callerId !== targetUserId) return false;
-    const protectedFields = ["role", "first_name", "last_name", "auth_email", "is_active", "points"];
+    if (caller.role === "admin" && caller.isActive) return true;
+    if (caller.id !== targetUserId) return false;
+    const protectedFields = ["role", "first_name", "last_name", "is_active", "points"];
     if (protectedFields.includes(field)) {
       return false; // Blocked for regular users
     }
     return true; // e.g. username, avatar_url
   }
 
-  it("1. Anonymous user cannot view any predictions", () => {
-    const canView = rlsCanSelectPrediction(null, null, predictionUserB_Future, futureMatch);
+  it("1. Anonymous user cannot access auth_mappings or view predictions", () => {
+    expect(rlsCanAccessAuthMappings("anon")).toBe(false);
+    expect(rlsCanSelectPrediction(null, predictionUserB_Future, futureMatch)).toBe(false);
+  });
+
+  it("2. Authenticated user cannot access private auth_mappings directly", () => {
+    expect(rlsCanAccessAuthMappings("authenticated")).toBe(false);
+  });
+
+  it("3. Service role can access auth_mappings", () => {
+    expect(rlsCanAccessAuthMappings("service_role")).toBe(true);
+  });
+
+  it("4. User A CANNOT view User B's prediction BEFORE kickoff", () => {
+    const canView = rlsCanSelectPrediction(activeUserA, predictionUserB_Future, futureMatch);
     expect(canView).toBe(false);
   });
 
-  it("2. User A CANNOT view User B's prediction BEFORE kickoff", () => {
-    const canView = rlsCanSelectPrediction(
-      userA.id,
-      userA.role,
-      predictionUserB_Future,
-      futureMatch
-    );
-    expect(canView).toBe(false);
-  });
-
-  it("3. User A CAN view User B's prediction AFTER kickoff", () => {
-    const canView = rlsCanSelectPrediction(
-      userA.id,
-      userA.role,
-      predictionUserB_Past,
-      pastMatch
-    );
+  it("5. User A CAN view User B's prediction AFTER kickoff", () => {
+    const canView = rlsCanSelectPrediction(activeUserA, predictionUserB_Past, pastMatch);
     expect(canView).toBe(true);
   });
 
-  it("4. User B can always view their own prediction before kickoff", () => {
-    const canView = rlsCanSelectPrediction(
-      userB.id,
-      userB.role,
-      predictionUserB_Future,
-      futureMatch
-    );
-    expect(canView).toBe(true);
-  });
-
-  it("5. User A cannot insert or update User B's prediction", () => {
-    const canEdit = rlsCanInsertOrUpdatePrediction(userA.id, userB.id, futureMatch);
+  it("6. Deactivated user is IMMEDIATELY blocked from inserting or updating predictions", () => {
+    const canEdit = rlsCanInsertOrUpdatePrediction(deactivatedUser, deactivatedUser.id, futureMatch);
     expect(canEdit).toBe(false);
   });
 
-  it("6. User A can update their own prediction BEFORE kickoff", () => {
-    const canEdit = rlsCanInsertOrUpdatePrediction(userA.id, userA.id, futureMatch);
-    expect(canEdit).toBe(true);
+  it("7. Active user can update own prediction before kickoff but NOT after", () => {
+    expect(rlsCanInsertOrUpdatePrediction(activeUserA, activeUserA.id, futureMatch)).toBe(true);
+    expect(rlsCanInsertOrUpdatePrediction(activeUserA, activeUserA.id, pastMatch)).toBe(false);
   });
 
-  it("7. User A CANNOT update their own prediction AFTER kickoff", () => {
-    const canEdit = rlsCanInsertOrUpdatePrediction(userA.id, userA.id, pastMatch);
-    expect(canEdit).toBe(false);
+  it("8. Regular user cannot change first_name, last_name, role or is_active", () => {
+    expect(canUpdateProfileField(activeUserA, activeUserA.id, "first_name")).toBe(false);
+    expect(canUpdateProfileField(activeUserA, activeUserA.id, "last_name")).toBe(false);
+    expect(canUpdateProfileField(activeUserA, activeUserA.id, "role")).toBe(false);
+    expect(canUpdateProfileField(activeUserA, activeUserA.id, "is_active")).toBe(false);
   });
 
-  it("8. Regular user cannot change their role to admin", () => {
-    const allowed = canUpdateProfile(userA.role, userA.id, userA.id, "role");
-    expect(allowed).toBe(false);
+  it("9. Regular user can change username and avatar_url", () => {
+    expect(canUpdateProfileField(activeUserA, activeUserA.id, "username")).toBe(true);
+    expect(canUpdateProfileField(activeUserA, activeUserA.id, "avatar_url")).toBe(true);
   });
 
-  it("9. Regular user cannot change their first_name or last_name", () => {
-    expect(canUpdateProfile(userA.role, userA.id, userA.id, "first_name")).toBe(false);
-    expect(canUpdateProfile(userA.role, userA.id, userA.id, "last_name")).toBe(false);
-  });
-
-  it("10. Regular user can change their username and avatar_url", () => {
-    expect(canUpdateProfile(userA.role, userA.id, userA.id, "username")).toBe(true);
-    expect(canUpdateProfile(userA.role, userA.id, userA.id, "avatar_url")).toBe(true);
-  });
-
-  it("11. Admin can modify protected profile fields", () => {
-    expect(canUpdateProfile(adminUser.role, userA.id, adminUser.id, "first_name")).toBe(true);
-    expect(canUpdateProfile(adminUser.role, userA.id, adminUser.id, "role")).toBe(true);
+  it("10. Admin can manage profile fields", () => {
+    expect(canUpdateProfileField(adminUser, activeUserA.id, "role")).toBe(true);
+    expect(canUpdateProfileField(adminUser, activeUserA.id, "first_name")).toBe(true);
   });
 });

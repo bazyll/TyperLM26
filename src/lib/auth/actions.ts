@@ -1,101 +1,107 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { UserProfile } from "@/types";
 import { Database } from "@/types/database.types";
+import {
+  usernameSchema,
+  passwordSchema,
+  loginSchema,
+  createUserSchema,
+  updateUserSchema,
+  ActionResult,
+} from "./schemas";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type AuditLogRow = Database["public"]["Tables"]["audit_logs"]["Row"];
 
-export interface LoginActionResult {
-  success: boolean;
-  error?: string;
-}
-
-const MAX_ATTEMPTS = 5;
-const WINDOW_SECONDS = 60;
+// ============================================================================
+// AUTHENTICATION & SESSION ACTIONS
+// ============================================================================
 
 /**
- * Server Action: Login with Username and Password.
- *
- * Fully compatible with Vercel Serverless Functions:
- * - Persistent rate limiting backed by Supabase PostgreSQL (login_attempts table)
- * - Case-insensitive username normalization
- * - Lookup of internal Supabase Auth email from profiles
- * - signInWithPassword via Supabase Auth
- * - Generic error "Nieprawidłowy login lub hasło"
+ * Server Action: Login with Username and Password
  */
 export async function loginWithUsernameAction(
-  prevState: LoginActionResult | null,
+  prevState: ActionResult | null,
   formData: FormData
-): Promise<LoginActionResult> {
-  const username = formData.get("username")?.toString().trim();
-  const password = formData.get("password")?.toString();
+): Promise<ActionResult> {
+  const rawUsername = formData.get("username")?.toString().trim() || "";
+  const rawPassword = formData.get("password")?.toString() || "";
 
-  if (!username || !password) {
+  const validation = loginSchema.safeParse({ username: rawUsername, password: rawPassword });
+  if (!validation.success) {
     return { success: false, error: "Wprowadź login i hasło." };
   }
 
-  const normalizedUsername = username.toLowerCase();
+  const normalizedUsername = rawUsername.toLowerCase();
 
   try {
     const adminSupabase = createAdminClient();
     const serverSupabase = await createClient();
 
-    // 1. Persistent Rate Limiting Check (Serverless & multi-instance safe in PostgreSQL)
-    const windowStart = new Date(Date.now() - WINDOW_SECONDS * 1000).toISOString();
-    const { count: attemptCount, error: countError } = await adminSupabase
-      .from("login_attempts")
-      .select("*", { count: "exact", head: true })
-      .eq("identifier", normalizedUsername)
-      .gte("attempted_at", windowStart);
+    // 1. Atomic Rate Limiting in PostgreSQL
+    const { data: rateLimitResult, error: rateLimitError } = await adminSupabase.rpc(
+      "check_and_record_login_attempt",
+      {
+        p_ip: "direct",
+        p_username: normalizedUsername,
+        p_max_attempts: 5,
+        p_window_seconds: 60,
+      }
+    );
 
-    if (!countError && attemptCount !== null && attemptCount >= MAX_ATTEMPTS) {
+    if (!rateLimitError && rateLimitResult && rateLimitResult[0] && !rateLimitResult[0].is_allowed) {
+      const waitSeconds = rateLimitResult[0].remaining_seconds || 60;
       return {
         success: false,
-        error: `Zbyt wiele nieudanych prób logowania. Odczekaj chwilę przed kolejną próbą.`,
+        error: `Zbyt wiele nieudanych prób logowania. Odczekaj ${waitSeconds}s przed kolejną próbą.`,
       };
     }
 
-    // 2. Lookup profile by case-insensitive username using admin client
-    const { data, error: profileError } = await adminSupabase
-      .from("profiles")
-      .select("*")
+    // 2. Lookup private auth mapping (auth_mappings)
+    const { data: mapping, error: mapError } = await adminSupabase
+      .from("auth_mappings")
+      .select("user_id, auth_email")
       .eq("username", normalizedUsername)
       .maybeSingle();
 
-    const profile = data as ProfileRow | null;
-
-    if (profileError || !profile || !profile.is_active) {
-      // Record failed attempt in persistent database table
-      await adminSupabase.from("login_attempts").insert({ identifier: normalizedUsername });
+    if (mapError || !mapping) {
       return { success: false, error: "Nieprawidłowy login lub hasło." };
     }
 
-    // 3. Perform standard Supabase Auth signInWithPassword using internal auth_email
+    // 3. Verify user active status in profiles
+    const { data: profile, error: profError } = await adminSupabase
+      .from("profiles")
+      .select("id, is_active")
+      .eq("id", mapping.user_id)
+      .maybeSingle();
+
+    if (profError || !profile || !profile.is_active) {
+      return { success: false, error: "Nieprawidłowy login lub hasło." };
+    }
+
+    // 4. Perform Supabase Auth login using internal auth_email
     const { error: authError } = await serverSupabase.auth.signInWithPassword({
-      email: profile.auth_email,
-      password: password,
+      email: mapping.auth_email,
+      password: rawPassword,
     });
 
     if (authError) {
-      // Record failed attempt in persistent database table
-      await adminSupabase.from("login_attempts").insert({ identifier: normalizedUsername });
       return { success: false, error: "Nieprawidłowy login lub hasło." };
     }
 
-    // Success: clean up old attempts for this user identifier
-    await adminSupabase
-      .from("login_attempts")
-      .delete()
-      .eq("identifier", normalizedUsername);
+    // 5. Success: clear failed attempts
+    await adminSupabase.from("login_attempts").delete().eq("username", normalizedUsername);
   } catch (err) {
     console.error("Login unexpected error:", err);
     return { success: false, error: "Nieprawidłowy login lub hasło." };
   }
 
-  // Redirect to dashboard on successful login
   redirect("/");
 }
 
@@ -109,7 +115,7 @@ export async function logoutAction() {
 }
 
 /**
- * Server Helper: Get currently logged in user profile.
+ * Server Helper: Get currently logged in user profile (with immediate deactivation check)
  */
 export async function getCurrentUserProfile(): Promise<UserProfile | null> {
   try {
@@ -131,6 +137,12 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
 
     if (profileError || !profile) return null;
 
+    // Immediate deactivation enforcement: if account is inactive, sign out immediately
+    if (!profile.is_active) {
+      await supabase.auth.signOut();
+      return null;
+    }
+
     return {
       id: profile.id,
       username: profile.username,
@@ -148,7 +160,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
 }
 
 /**
- * Server Helper: Require admin role for privileged actions.
+ * Server Helper: Require admin role for privileged operations
  */
 export async function requireAdminRole(): Promise<UserProfile> {
   const profile = await getCurrentUserProfile();
@@ -156,4 +168,520 @@ export async function requireAdminRole(): Promise<UserProfile> {
     throw new Error("Dostęp zabroniony: wymagane uprawnienia administratora.");
   }
   return profile;
+}
+
+// ============================================================================
+// PROFILE & ACCOUNT SETTINGS ACTIONS (USER SELF-MANAGEMENT)
+// ============================================================================
+
+/**
+ * Server Action: Update Username (by current user)
+ */
+export async function updateUsernameAction(newUsername: string): Promise<ActionResult> {
+  const currentUser = await getCurrentUserProfile();
+  if (!currentUser) return { success: false, error: "Wymagane logowanie." };
+
+  const parsed = usernameSchema.safeParse(newUsername.trim());
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Niepoprawny format loginu." };
+  }
+
+  const normalized = parsed.data.toLowerCase();
+  if (normalized === currentUser.username.toLowerCase()) {
+    return { success: true };
+  }
+
+  try {
+    const adminSupabase = createAdminClient();
+
+    // Check uniqueness
+    const { data: existing } = await adminSupabase
+      .from("profiles")
+      .select("id")
+      .eq("username", normalized)
+      .maybeSingle();
+
+    if (existing) {
+      return { success: false, error: "Ten login jest już zajęty przez innego użytkownika." };
+    }
+
+    // Update profile (trigger automatically keeps auth_mappings synchronized)
+    const { error: updateError } = await adminSupabase
+      .from("profiles")
+      .update({ username: normalized, updated_at: new Date().toISOString() })
+      .eq("id", currentUser.id);
+
+    if (updateError) throw updateError;
+
+    // Explicitly update auth_mappings to be 100% atomic
+    await adminSupabase
+      .from("auth_mappings")
+      .update({ username: normalized })
+      .eq("user_id", currentUser.id);
+
+    // Record audit log
+    await adminSupabase.from("audit_logs").insert({
+      actor_id: currentUser.id,
+      action: "USERNAME_CHANGED",
+      target_type: "user",
+      target_id: currentUser.id,
+      details: { oldUsername: currentUser.username, newUsername: normalized },
+    });
+
+    revalidatePath("/konto");
+    revalidatePath(`/profil/${normalized}`);
+    return { success: true };
+  } catch (err) {
+    console.error("Error updating username:", err);
+    return { success: false, error: "Wystąpił błąd podczas zmiany loginu." };
+  }
+}
+
+/**
+ * Server Action: Change Password (by current user)
+ */
+export async function changePasswordAction(newPassword: string): Promise<ActionResult> {
+  const currentUser = await getCurrentUserProfile();
+  if (!currentUser) return { success: false, error: "Wymagane logowanie." };
+
+  const parsed = passwordSchema.safeParse(newPassword);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Hasło nie spełnia wymagań." };
+  }
+
+  try {
+    const serverSupabase = await createClient();
+    const adminSupabase = createAdminClient();
+
+    const { error } = await serverSupabase.auth.updateUser({
+      password: parsed.data,
+    });
+
+    if (error) {
+      return { success: false, error: "Nie udało się zmienić hasła: " + error.message };
+    }
+
+    await adminSupabase.from("audit_logs").insert({
+      actor_id: currentUser.id,
+      action: "PASSWORD_CHANGED",
+      target_type: "user",
+      target_id: currentUser.id,
+      details: { timestamp: new Date().toISOString() },
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error("Error changing password:", err);
+    return { success: false, error: "Wystąpił błąd podczas zmiany hasła." };
+  }
+}
+
+/**
+ * Server Action: Update Avatar URL (by current user)
+ */
+export async function updateAvatarUrlAction(avatarUrl: string): Promise<ActionResult> {
+  const currentUser = await getCurrentUserProfile();
+  if (!currentUser) return { success: false, error: "Wymagane logowanie." };
+
+  try {
+    const adminSupabase = createAdminClient();
+
+    const { error } = await adminSupabase
+      .from("profiles")
+      .update({ avatar_url: avatarUrl, updated_at: new Date().toISOString() })
+      .eq("id", currentUser.id);
+
+    if (error) throw error;
+
+    revalidatePath("/konto");
+    revalidatePath(`/profil/${currentUser.username}`);
+    return { success: true };
+  } catch (err) {
+    console.error("Error updating avatar:", err);
+    return { success: false, error: "Wystąpił błąd podczas aktualizacji zdjęcia profilowego." };
+  }
+}
+
+// ============================================================================
+// ADMIN USER MANAGEMENT ACTIONS (ADMIN ONLY)
+// ============================================================================
+
+/**
+ * Server Action: Admin creates a new user account (with atomic rollback on failure)
+ */
+export async function adminCreateUserAction(input: z.infer<typeof createUserSchema>): Promise<ActionResult> {
+  const admin = await requireAdminRole();
+
+  const parsed = createUserSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Błędne dane formularza." };
+  }
+
+  const { username, firstName, lastName, password, role } = parsed.data;
+  const normalizedUsername = username.toLowerCase();
+  const internalEmail = `user_${Date.now()}_${Math.random().toString(36).slice(2, 7)}@typerlm26.auth`;
+
+  const adminSupabase = createAdminClient();
+
+  // Check username uniqueness
+  const { data: existing } = await adminSupabase
+    .from("profiles")
+    .select("id")
+    .eq("username", normalizedUsername)
+    .maybeSingle();
+
+  if (existing) {
+    return { success: false, error: "Użytkownik o takim loginie już istnieje." };
+  }
+
+  // Step 1: Create Supabase Auth user
+  const { data: authData, error: authError } = await adminSupabase.auth.admin.createUser({
+    email: internalEmail,
+    password: password,
+    email_confirm: true,
+    user_metadata: { first_name: firstName, last_name: lastName },
+  });
+
+  if (authError || !authData.user) {
+    console.error("Auth creation error:", authError);
+    return { success: false, error: "Błąd podczas tworzenia konta Auth." };
+  }
+
+  const newUserId = authData.user.id;
+
+  try {
+    // Step 2: Insert into private auth_mappings
+    const { error: mapError } = await adminSupabase.from("auth_mappings").insert({
+      user_id: newUserId,
+      username: normalizedUsername,
+      auth_email: internalEmail,
+    });
+
+    if (mapError) throw mapError;
+
+    // Step 3: Insert into public profiles
+    const { error: profError } = await adminSupabase.from("profiles").insert({
+      id: newUserId,
+      username: normalizedUsername,
+      first_name: firstName,
+      last_name: lastName,
+      role: role,
+      is_active: true,
+    });
+
+    if (profError) throw profError;
+
+    // Step 4: Record audit log (No password recorded!)
+    await adminSupabase.from("audit_logs").insert({
+      actor_id: admin.id,
+      action: "USER_CREATED",
+      target_type: "user",
+      target_id: newUserId,
+      details: { username: normalizedUsername, firstName, lastName, role },
+    });
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (err) {
+    console.error("Rollback: deleting created auth user due to database failure:", err);
+    await adminSupabase.auth.admin.deleteUser(newUserId);
+    return { success: false, error: "Błąd podczas zapisu profilu użytkownika. Operacja została cofnięta." };
+  }
+}
+
+/**
+ * Server Action: Admin updates user details (name, username, active status)
+ */
+export async function adminUpdateUserAction(input: z.infer<typeof updateUserSchema>): Promise<ActionResult> {
+  const admin = await requireAdminRole();
+
+  const parsed = updateUserSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Błędne dane formularza." };
+  }
+
+  const { userId, firstName, lastName, username, isActive } = parsed.data;
+  const normalizedUsername = username.toLowerCase();
+  const adminSupabase = createAdminClient();
+
+  try {
+    const { data: targetProfile, error: fetchErr } = await adminSupabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (fetchErr || !targetProfile) {
+      return { success: false, error: "Nie znaleziono użytkownika." };
+    }
+
+    // If deactivating an admin, ensure not the last active admin
+    if (!isActive && targetProfile.role === "admin") {
+      const { count } = await adminSupabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "admin")
+        .eq("is_active", true);
+
+      if (count !== null && count <= 1) {
+        return { success: false, error: "Nie można dezaktywować ostatniego aktywnego administratora systemu." };
+      }
+    }
+
+    // If username changed, verify uniqueness
+    if (normalizedUsername !== targetProfile.username.toLowerCase()) {
+      const { data: existing } = await adminSupabase
+        .from("profiles")
+        .select("id")
+        .eq("username", normalizedUsername)
+        .neq("id", userId)
+        .maybeSingle();
+
+      if (existing) {
+        return { success: false, error: "Ten login jest już zajęty przez innego użytkownika." };
+      }
+    }
+
+    // Immediate session ban / unban in Supabase Auth Admin API
+    if (isActive !== targetProfile.is_active) {
+      if (!isActive) {
+        await adminSupabase.auth.admin.updateUserById(userId, { ban_duration: "876000h" });
+      } else {
+        await adminSupabase.auth.admin.updateUserById(userId, { ban_duration: "none" });
+      }
+    }
+
+    // Update profiles
+    const { error: updateProfErr } = await adminSupabase
+      .from("profiles")
+      .update({
+        first_name: firstName,
+        last_name: lastName,
+        username: normalizedUsername,
+        is_active: isActive,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+
+    if (updateProfErr) throw updateProfErr;
+
+    // Update auth_mappings
+    await adminSupabase
+      .from("auth_mappings")
+      .update({ username: normalizedUsername })
+      .eq("user_id", userId);
+
+    // Audit log
+    await adminSupabase.from("audit_logs").insert({
+      actor_id: admin.id,
+      action: isActive !== targetProfile.is_active ? (isActive ? "USER_REACTIVATED" : "USER_DEACTIVATED") : "USER_UPDATED",
+      target_type: "user",
+      target_id: userId,
+      details: { username: normalizedUsername, firstName, lastName, isActive },
+    });
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (err) {
+    console.error("Error updating user by admin:", err);
+    return { success: false, error: "Wystąpił błąd podczas aktualizacji użytkownika." };
+  }
+}
+
+/**
+ * Server Action: Admin toggles user role (admin <-> user)
+ */
+export async function adminToggleRoleAction(userId: string, newRole: "user" | "admin"): Promise<ActionResult> {
+  const admin = await requireAdminRole();
+  const adminSupabase = createAdminClient();
+
+  try {
+    const { data: targetProfile, error: fetchErr } = await adminSupabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (fetchErr || !targetProfile) {
+      return { success: false, error: "Nie znaleziono użytkownika." };
+    }
+
+    if (targetProfile.role === newRole) return { success: true };
+
+    // If revoking admin role, check last active admin guard
+    if (newRole === "user" && targetProfile.role === "admin") {
+      const { count } = await adminSupabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "admin")
+        .eq("is_active", true);
+
+      if (count !== null && count <= 1) {
+        return { success: false, error: "Nie można odebrać uprawnień ostatniemu aktywnemu administratorowi." };
+      }
+    }
+
+    const { error: updateError } = await adminSupabase
+      .from("profiles")
+      .update({ role: newRole, updated_at: new Date().toISOString() })
+      .eq("id", userId);
+
+    if (updateError) throw updateError;
+
+    await adminSupabase.from("audit_logs").insert({
+      actor_id: admin.id,
+      action: newRole === "admin" ? "ROLE_GRANTED_ADMIN" : "ROLE_REVOKED_ADMIN",
+      target_type: "user",
+      target_id: userId,
+      details: { username: targetProfile.username, oldRole: targetProfile.role, newRole },
+    });
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (err) {
+    console.error("Error toggling role:", err);
+    return { success: false, error: "Wystąpił błąd podczas zmiany roli." };
+  }
+}
+
+/**
+ * Server Action: Admin resets user password (temporary password)
+ */
+export async function adminResetPasswordAction(userId: string, newPassword: string): Promise<ActionResult> {
+  const admin = await requireAdminRole();
+
+  const parsed = passwordSchema.safeParse(newPassword);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Hasło nie spełnia wymagań." };
+  }
+
+  const adminSupabase = createAdminClient();
+
+  try {
+    const { data: targetProfile, error: fetchErr } = await adminSupabase
+      .from("profiles")
+      .select("username")
+      .eq("id", userId)
+      .single();
+
+    if (fetchErr || !targetProfile) {
+      return { success: false, error: "Nie znaleziono użytkownika." };
+    }
+
+    const { error } = await adminSupabase.auth.admin.updateUserById(userId, {
+      password: parsed.data,
+    });
+
+    if (error) {
+      return { success: false, error: "Nie udało się zresetować hasła: " + error.message };
+    }
+
+    // Audit log (NO password in details!)
+    await adminSupabase.from("audit_logs").insert({
+      actor_id: admin.id,
+      action: "PASSWORD_RESET",
+      target_type: "user",
+      target_id: userId,
+      details: { username: targetProfile.username, timestamp: new Date().toISOString() },
+    });
+
+    return { success: true };
+  } catch (err) {
+    console.error("Error resetting password by admin:", err);
+    return { success: false, error: "Wystąpił błąd podczas resetowania hasła." };
+  }
+}
+
+/**
+ * Server Action: Admin deletes user (with last admin & league history protection)
+ */
+export async function adminDeleteUserAction(userId: string): Promise<ActionResult> {
+  const admin = await requireAdminRole();
+  const adminSupabase = createAdminClient();
+
+  try {
+    const { data: targetProfile, error: fetchErr } = await adminSupabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .single();
+
+    if (fetchErr || !targetProfile) {
+      return { success: false, error: "Nie znaleziono użytkownika." };
+    }
+
+    // Prevent deleting last active admin
+    if (targetProfile.role === "admin") {
+      const { count } = await adminSupabase
+        .from("profiles")
+        .select("*", { count: "exact", head: true })
+        .eq("role", "admin")
+        .eq("is_active", true);
+
+      if (count !== null && count <= 1) {
+        return { success: false, error: "Nie można usunąć ostatniego aktywnego administratora systemu." };
+      }
+    }
+
+    // Record audit log before deletion
+    await adminSupabase.from("audit_logs").insert({
+      actor_id: admin.id,
+      action: "USER_DELETED",
+      target_type: "user",
+      target_id: userId,
+      details: { username: targetProfile.username, firstName: targetProfile.first_name, lastName: targetProfile.last_name },
+    });
+
+    // Delete in sequence
+    await adminSupabase.from("auth_mappings").delete().eq("user_id", userId);
+    await adminSupabase.from("profiles").delete().eq("id", userId);
+    await adminSupabase.auth.admin.deleteUser(userId);
+
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (err) {
+    console.error("Error deleting user by admin:", err);
+    return { success: false, error: "Wystąpił błąd podczas usuwania użytkownika. Zamiast usuwania zalecana jest deaktywacja." };
+  }
+}
+
+/**
+ * Server Action: Fetch all users for Admin Panel
+ */
+export async function adminGetUsersListAction(): Promise<ProfileRow[]> {
+  await requireAdminRole();
+  const adminSupabase = createAdminClient();
+
+  const { data, error } = await adminSupabase
+    .from("profiles")
+    .select("*")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching users list:", error);
+    return [];
+  }
+
+  return (data as ProfileRow[]) || [];
+}
+
+/**
+ * Server Action: Fetch audit logs for Admin Panel
+ */
+export async function adminGetAuditLogsAction(): Promise<AuditLogRow[]> {
+  await requireAdminRole();
+  const adminSupabase = createAdminClient();
+
+  const { data, error } = await adminSupabase
+    .from("audit_logs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) {
+    console.error("Error fetching audit logs:", error);
+    return [];
+  }
+
+  return (data as AuditLogRow[]) || [];
 }

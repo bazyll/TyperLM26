@@ -4,7 +4,6 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "TyperLM26 — Liga Mistrzów 2026/2027",
   description: "Prywatna aplikacja do typowania meczów UEFA Champions League 2026/2027",
-  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
