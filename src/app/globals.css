@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: #070b14;
+    --foreground: #f8fafc;
+
+    --card: #0c1527;
+    --card-foreground: #f8fafc;
+    --card-hover: #101d36;
+
+    --popover: #0c1527;
+    --popover-foreground: #f8fafc;
+
+    --primary: #2563eb;
+    --primary-foreground: #ffffff;
+    --primary-hover: #1d4ed8;
+
+    --secondary: #162444;
+    --secondary-foreground: #94a3b8;
+
+    --muted: #131f38;
+    --muted-foreground: #64748b;
+
+    --accent: #1e3a8a;
+    --accent-foreground: #bfdbfe;
+
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+
+    --border: #182645;
+    --input: #182645;
+    --ring: #3b82f6;
+
+    --radius: 0.75rem;
+
+    --gold: #f59e0b;
+    --silver: #94a3b8;
+    --bronze: #d97706;
+  }
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Custom Sports / UCL Subtle Glows & Effects */
+.ucl-gradient-card {
+  background: linear-gradient(135deg, rgba(16, 29, 54, 0.9) 0%, rgba(12, 21, 39, 0.95) 100%);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+}
+
+.ucl-hero-banner {
+  background: radial-gradient(circle at 80% 50%, rgba(37, 99, 235, 0.25) 0%, rgba(124, 58, 237, 0.15) 35%, rgba(12, 21, 39, 0.95) 70%), #0c1527;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.ucl-special-card {
+  background: linear-gradient(180deg, rgba(22, 36, 68, 0.7) 0%, rgba(12, 21, 39, 0.95) 100%);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  transition: all 0.2s ease-in-out;
+}
+
+.ucl-special-card:hover {
+  border-color: rgba(96, 165, 250, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(37, 99, 235, 0.2);
+}
+
+.glow-blue {
+  box-shadow: 0 0 20px rgba(37, 99, 235, 0.3);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #070b14;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #182645;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2563eb;
+}
