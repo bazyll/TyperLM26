@@ -295,14 +295,40 @@ export async function adminSettlePickemAction(): Promise<ActionResult> {
       return { success: false, error: `Wymagane jest dokładnie 36 drużyn w lidze (znaleziono ${teams.length}).` };
     }
 
-    // 2. Strict completeness verification: every team MUST have exactly 8 finished matches
+    // 2. Strict completeness verification:
+    // - exactly 36 teams
+    // - exactly 144 finished matches
+    // - each match has distinct teams (no self-matches)
+    // - each match has non-null final scores
+    // - no duplicate matches between same pair
+    // - every single team has exactly 8 finished matches
     const matchesPerTeam = new Map<string, number>();
     teams.forEach((t) => matchesPerTeam.set(t.id, 0));
 
-    matches.forEach((m) => {
+    const seenMatchPairs = new Set<string>();
+
+    for (const m of matches) {
+      if (m.home_team_id === m.away_team_id) {
+        return { success: false, error: `Wykryto nieprawidłowy mecz z tym samym klubem jako gospodarz i gość (ID meczu: ${m.id}).` };
+      }
+
+      if (m.home_score === null || m.away_score === null) {
+        return { success: false, error: `Mecz ${m.id} ma status 'finished', ale brak wpisanego wyniku końcowego.` };
+      }
+
+      if (m.status !== "finished") {
+        return { success: false, error: `Mecz ${m.id} nie jest zakończony (status: ${m.status}).` };
+      }
+
+      const pairKey = `${m.home_team_id}__${m.away_team_id}`;
+      if (seenMatchPairs.has(pairKey)) {
+        return { success: false, error: `Wykryto zduplikowany mecz pomiędzy tymi samymi drużynami (para: ${pairKey}).` };
+      }
+      seenMatchPairs.add(pairKey);
+
       matchesPerTeam.set(m.home_team_id, (matchesPerTeam.get(m.home_team_id) || 0) + 1);
       matchesPerTeam.set(m.away_team_id, (matchesPerTeam.get(m.away_team_id) || 0) + 1);
-    });
+    }
 
     const incompleteTeams: string[] = [];
     for (const [teamId, count] of matchesPerTeam.entries()) {

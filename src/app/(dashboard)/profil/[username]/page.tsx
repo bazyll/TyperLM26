@@ -220,45 +220,54 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
 
         {canViewPickem ? (
           pickemSub ? (
-            <div className="space-y-3">
-              {/* FIRST */}
-              <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30">
-                <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block mb-1">
-                  🥇 FIRST (1. miejsce)
-                </span>
-                <span className="text-sm font-bold text-white">
-                  {pickemSub.first_team_id ? teamsMap.get(pickemSub.first_team_id)?.name : "Brak"}
-                </span>
-              </div>
+            (() => {
+              const userSelections = pickemSels.filter((s) => s.submission_id === pickemSub.id);
+              const firstSelection = userSelections.find((s) => s.category === "first");
+              const top8Selections = userSelections.filter((s) => s.category === "top8");
+              const outSelections = userSelections.filter((s) => s.category === "out");
 
-              {/* TOP 8 */}
-              <div className="p-3 rounded-xl bg-blue-950/20 border border-blue-500/30">
-                <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider block mb-1">
-                  🔵 TOP 8 (miejsca 1–8)
-                </span>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {pickemSub.top8_team_ids?.map((tid) => (
-                    <span key={tid} className="px-2 py-0.5 rounded-md bg-blue-500/20 text-xs font-semibold text-blue-200">
-                      {teamsMap.get(tid)?.short_name || tid}
+              return (
+                <div className="space-y-3">
+                  {/* FIRST */}
+                  <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30">
+                    <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block mb-1">
+                      🥇 FIRST (1. miejsce)
                     </span>
-                  ))}
-                </div>
-              </div>
+                    <span className="text-sm font-bold text-white">
+                      {firstSelection?.team_id ? teamsMap.get(firstSelection.team_id)?.name : "Brak"}
+                    </span>
+                  </div>
 
-              {/* OUT */}
-              <div className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/30">
-                <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider block mb-1">
-                  🔴 OUT (miejsca 25–36)
-                </span>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {pickemSub.out_team_ids?.map((tid) => (
-                    <span key={tid} className="px-2 py-0.5 rounded-md bg-rose-500/20 text-xs font-semibold text-rose-200">
-                      {teamsMap.get(tid)?.short_name || tid}
+                  {/* TOP 8 */}
+                  <div className="p-3 rounded-xl bg-blue-950/20 border border-blue-500/30">
+                    <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider block mb-1">
+                      🔵 TOP 8 (miejsca 1–8)
                     </span>
-                  ))}
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {top8Selections.map((s) => (
+                        <span key={s.id} className="px-2 py-0.5 rounded-md bg-blue-500/20 text-xs font-semibold text-blue-200">
+                          {teamsMap.get(s.team_id)?.short_name || s.team_id}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* OUT */}
+                  <div className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/30">
+                    <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider block mb-1">
+                      🔴 OUT (miejsca 25–36)
+                    </span>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {outSelections.map((s) => (
+                        <span key={s.id} className="px-2 py-0.5 rounded-md bg-rose-500/20 text-xs font-semibold text-rose-200">
+                          {teamsMap.get(s.team_id)?.short_name || s.team_id}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              );
+            })()
           ) : (
             <p className="text-xs text-slate-500 italic">Użytkownik nie zapisał zestawu Pick&apos;em.</p>
           )
