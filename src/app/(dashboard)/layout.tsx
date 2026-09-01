@@ -3,13 +3,17 @@ import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { Footer } from "@/components/layout/footer";
 import { getCurrentUserProfile } from "@/lib/auth/actions";
+import { getUnreadAnnouncementsCountAction } from "@/lib/announcements/actions";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const currentUser = await getCurrentUserProfile();
+  const [currentUser, unreadCount] = await Promise.all([
+    getCurrentUserProfile(),
+    getUnreadAnnouncementsCountAction(),
+  ]);
 
   const userProp = currentUser
     ? {
@@ -41,7 +45,7 @@ export default async function DashboardLayout({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
         {/* Top Header */}
-        <Header user={userProp} />
+        <Header user={userProp} unreadCount={unreadCount} />
 
         {/* Page Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">

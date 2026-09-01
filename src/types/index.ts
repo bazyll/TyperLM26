@@ -10,6 +10,7 @@ export interface UserProfile {
   isActive: boolean;
   points: number;
   rank?: number;
+  announcementsLastSeenAt?: string | null;
 }
 
 export interface MatchWithTeams {
@@ -169,18 +170,4 @@ export interface AnnouncementItem {
   isPinned: boolean;
   createdAt: string;
   updatedAt: string;
-  commentsCount: number;
-  comments?: AnnouncementCommentItem[];
-}
-
-export interface AnnouncementCommentItem {
-  id: string;
-  announcementId: string;
-  userId: string | null;
-  userName: string;
-  userAvatarUrl: string | null;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
-  isOwner?: boolean;
 }

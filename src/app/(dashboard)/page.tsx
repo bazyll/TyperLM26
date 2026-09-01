@@ -4,7 +4,8 @@ import { MiniRanking } from "@/components/dashboard/mini-ranking";
 import { SidebarMatches } from "@/components/dashboard/sidebar-matches";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { Bell, Pin, MessageSquare, ChevronRight, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Bell, Pin, ChevronRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -15,6 +16,9 @@ export default async function DashboardPage() {
     getLeaderboardAction(),
     getAnnouncementsAction(),
   ]);
+
+  // Homepage displays max 3 announcements: pinned first, newest first
+  const displayedAnnouncements = announcements.slice(0, 3);
 
   // Priority selection of max 3 sidebar matches:
   // 1. All currently LIVE matches
@@ -55,13 +59,13 @@ export default async function DashboardPage() {
             href="/ogloszenia"
             className="hidden sm:inline-flex items-center text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors"
           >
-            <span>Wszystkie ogłoszenia i dyskusje</span>
+            <span>Wszystkie ogłoszenia</span>
             <ChevronRight className="w-4 h-4 ml-0.5" />
           </Link>
         </div>
 
         {/* Announcements List */}
-        {announcements.length === 0 ? (
+        {displayedAnnouncements.length === 0 ? (
           <Card className="p-12 text-center rounded-3xl border-[#182645] bg-[#0c1527] shadow-xl">
             <div className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto mb-3">
               <Sparkles className="w-6 h-6" />
@@ -73,7 +77,7 @@ export default async function DashboardPage() {
           </Card>
         ) : (
           <div className="flex flex-col gap-4">
-            {announcements.map((item) => {
+            {displayedAnnouncements.map((item) => {
               const createdDate = new Date(item.createdAt);
               const dateStr = createdDate.toLocaleDateString("pl-PL", {
                 day: "numeric",
@@ -103,16 +107,6 @@ export default async function DashboardPage() {
                       )}
                       <span className="text-xs text-slate-400 font-medium">{dateStr}</span>
                     </div>
-
-                    {item.commentsCount > 0 && (
-                      <Link
-                        href={`/ogloszenia#announcement-${item.id}`}
-                        className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-300 transition-colors"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>{item.commentsCount}</span>
-                      </Link>
-                    )}
                   </div>
 
                   {/* Title */}
@@ -125,7 +119,7 @@ export default async function DashboardPage() {
                     {item.content}
                   </p>
 
-                  {/* Author & Discussion Footer */}
+                  {/* Author Footer */}
                   <div className="pt-3 border-t border-[#182645]/60 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2.5">
                       <Avatar className="w-6 h-6 sm:w-7 sm:h-7 border border-blue-500/20">
@@ -143,13 +137,27 @@ export default async function DashboardPage() {
                       href="/ogloszenia"
                       className="text-xs font-semibold text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
                     >
-                      <span>Komentarze ({item.commentsCount})</span>
+                      <span>Szczegóły</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
                   </div>
                 </Card>
               );
             })}
+
+            {/* Bottom link: Zobacz wszystkie ogłoszenia -> /ogloszenia */}
+            <div className="pt-2 text-center">
+              <Button
+                asChild
+                variant="outline"
+                className="rounded-2xl border-[#182645] bg-[#0c1527] text-blue-400 hover:text-white hover:bg-[#101d36] hover:border-blue-500/40 text-xs font-semibold px-5 py-2.5 shadow-md"
+              >
+                <Link href="/ogloszenia" className="inline-flex items-center gap-1.5">
+                  <span>Zobacz wszystkie ogłoszenia</span>
+                  <ChevronRight className="w-4 h-4" />
+                </Link>
+              </Button>
+            </div>
           </div>
         )}
       </div>

@@ -65,6 +65,7 @@ import {
   adminCreateAnnouncementAction,
   adminUpdateAnnouncementAction,
   adminDeleteAnnouncementAction,
+  adminTogglePinAnnouncementAction,
 } from "@/lib/announcements/actions";
 import {
   getAllPlayersAction,
@@ -468,12 +469,18 @@ export default function AdminPage() {
   const handleCreateAnnouncement = (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
-      const res = await adminCreateAnnouncementAction(announcementForm);
-      if (res.success) {
-        setStatusMessage({ type: "success", text: "Ogłoszenie opublikowane!" });
-        setShowCreateAnnouncementModal(false);
-        setAnnouncementForm({ title: "", content: "", isPinned: false });
-        loadData();
+      try {
+        const res = await adminCreateAnnouncementAction(announcementForm);
+        if (res.success) {
+          setStatusMessage({ type: "success", text: "Ogłoszenie opublikowane!" });
+          setShowCreateAnnouncementModal(false);
+          setAnnouncementForm({ title: "", content: "", isPinned: false });
+          loadData();
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd dodawania ogłoszenia." });
+        }
+      } catch (err: any) {
+        setStatusMessage({ type: "error", text: err.message || "Błąd dodawania ogłoszenia." });
       }
     });
   };
@@ -482,16 +489,22 @@ export default function AdminPage() {
     e.preventDefault();
     if (!editAnnouncementModal) return;
     startTransition(async () => {
-      const res = await adminUpdateAnnouncementAction({
-        id: editAnnouncementModal.id,
-        title: announcementForm.title,
-        content: announcementForm.content,
-        isPinned: announcementForm.isPinned,
-      });
-      if (res.success) {
-        setStatusMessage({ type: "success", text: "Ogłoszenie zaktualizowane!" });
-        setEditAnnouncementModal(null);
-        loadData();
+      try {
+        const res = await adminUpdateAnnouncementAction({
+          id: editAnnouncementModal.id,
+          title: announcementForm.title,
+          content: announcementForm.content,
+          isPinned: announcementForm.isPinned,
+        });
+        if (res.success) {
+          setStatusMessage({ type: "success", text: "Ogłoszenie zaktualizowane!" });
+          setEditAnnouncementModal(null);
+          loadData();
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd edycji ogłoszenia." });
+        }
+      } catch (err: any) {
+        setStatusMessage({ type: "error", text: err.message || "Błąd edycji ogłoszenia." });
       }
     });
   };
@@ -499,10 +512,35 @@ export default function AdminPage() {
   const handleDeleteAnnouncement = (id: string) => {
     if (!confirm("Czy na pewno chcesz usunąć to ogłoszenie?")) return;
     startTransition(async () => {
-      const res = await adminDeleteAnnouncementAction(id);
-      if (res.success) {
-        setStatusMessage({ type: "success", text: "Ogłoszenie usunięte." });
-        loadData();
+      try {
+        const res = await adminDeleteAnnouncementAction(id);
+        if (res.success) {
+          setStatusMessage({ type: "success", text: "Ogłoszenie usunięte." });
+          loadData();
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd usuwania ogłoszenia." });
+        }
+      } catch (err: any) {
+        setStatusMessage({ type: "error", text: err.message || "Błąd usuwania ogłoszenia." });
+      }
+    });
+  };
+
+  const handleTogglePinAnnouncement = (id: string, currentPinned: boolean) => {
+    startTransition(async () => {
+      try {
+        const res = await adminTogglePinAnnouncementAction(id, !currentPinned);
+        if (res.success) {
+          setStatusMessage({
+            type: "success",
+            text: !currentPinned ? "Ogłoszenie przypięte!" : "Ogłoszenie odpięte.",
+          });
+          loadData();
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd zmiany przypięcia." });
+        }
+      } catch (err: any) {
+        setStatusMessage({ type: "error", text: err.message || "Błąd zmiany przypięcia." });
       }
     });
   };
@@ -920,11 +958,23 @@ export default function AdminPage() {
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => handleTogglePinAnnouncement(ann.id, ann.isPinned)}
+                      className={`h-8 px-2 text-xs transition-colors ${
+                        ann.isPinned ? "text-blue-400 hover:text-slate-300" : "text-slate-400 hover:text-blue-400"
+                      }`}
+                      title={ann.isPinned ? "Odepnij ogłoszenie" : "Przypnij ogłoszenie"}
+                    >
+                      <Pin className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => {
                         setEditAnnouncementModal(ann);
                         setAnnouncementForm({ title: ann.title, content: ann.content, isPinned: ann.isPinned });
                       }}
                       className="h-8 px-2 text-xs text-slate-400 hover:text-white"
+                      title="Edytuj"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </Button>
@@ -933,14 +983,15 @@ export default function AdminPage() {
                       size="sm"
                       onClick={() => handleDeleteAnnouncement(ann.id)}
                       className="h-8 px-2 text-xs text-slate-400 hover:text-rose-400"
+                      title="Usuń"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
                 </div>
-                <p className="text-xs text-slate-300 whitespace-pre-wrap">{ann.content}</p>
+                <p className="text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">{ann.content}</p>
                 <div className="text-[11px] text-slate-500 pt-2 border-t border-slate-800">
-                  Opublikowano: {new Date(ann.createdAt).toLocaleString("pl-PL")} • Komentarze: {ann.commentsCount}
+                  Opublikowano: {new Date(ann.createdAt).toLocaleString("pl-PL")}
                 </div>
               </div>
             ))}

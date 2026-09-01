@@ -161,6 +161,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
       role: profile.role,
       isActive: profile.is_active,
       points: 0,
+      announcementsLastSeenAt: profile.announcements_last_seen_at || null,
     };
   } catch (err) {
     console.error("Error fetching current user profile:", err);

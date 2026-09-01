@@ -22,6 +22,7 @@ interface HeaderProps {
     role?: "user" | "admin";
     points?: number;
   };
+  unreadCount?: number;
 }
 
 export function Header({
@@ -33,6 +34,7 @@ export function Header({
     role: "admin",
     points: 1250,
   },
+  unreadCount = 0,
 }: HeaderProps) {
   const initials = `${user.firstName[0] || "U"}${user.lastName[0] || ""}`;
 
@@ -72,9 +74,11 @@ export function Header({
           className="relative flex items-center justify-center w-10 h-10 rounded-full border border-[#182645] bg-[#0c1527] text-slate-300 hover:text-white hover:border-blue-500/40 transition-all"
         >
           <Bell className="w-4 h-4 text-slate-300" />
-          <span className="absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 rounded-full bg-blue-600 text-[10px] font-bold text-white border-2 border-[#070b14]">
-            3
-          </span>
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-blue-600 text-[10px] font-bold text-white border-2 border-[#070b14] animate-in zoom-in-50">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
         </Link>
 
         {/* User Pill Dropdown */}

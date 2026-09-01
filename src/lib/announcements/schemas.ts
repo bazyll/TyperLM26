@@ -17,21 +17,3 @@ export const createAnnouncementSchema = z.object({
 export const updateAnnouncementSchema = createAnnouncementSchema.extend({
   id: z.string().uuid("Niepoprawne ID ogłoszenia"),
 });
-
-export const addCommentSchema = z.object({
-  announcementId: z.string().uuid("Niepoprawne ID ogłoszenia"),
-  content: z
-    .string()
-    .trim()
-    .min(1, "Komentarz nie może być pusty")
-    .max(1000, "Komentarz może mieć maksymalnie 1000 znaków"),
-});
-
-export const updateCommentSchema = z.object({
-  commentId: z.string().uuid("Niepoprawne ID komentarza"),
-  content: z
-    .string()
-    .trim()
-    .min(1, "Komentarz nie może być pusty")
-    .max(1000, "Komentarz może mieć maksymalnie 1000 znaków"),
-});
