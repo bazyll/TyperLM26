@@ -96,4 +96,34 @@ describe("Leaderboard Ranking & Aggregation Logic", () => {
     // Deactivated user is not in active leaderboard
     expect(leaderboard.find((e) => e.username === "banned_user")).toBeUndefined();
   });
+
+  it("selects up to 4 focus matches prioritizing LIVE matches then recently finished matches", () => {
+    const mockMatches = [
+      { id: "m_fut_1", status: "scheduled", kickoffAt: "2026-10-01T20:00:00Z" },
+      { id: "m_fin_old", status: "finished", kickoffAt: "2026-09-01T18:00:00Z" },
+      { id: "m_fin_mid", status: "finished", kickoffAt: "2026-09-02T18:00:00Z" },
+      { id: "m_fin_new", status: "finished", kickoffAt: "2026-09-03T18:00:00Z" },
+      { id: "m_live_1", status: "live", kickoffAt: "2026-09-04T19:00:00Z" },
+      { id: "m_live_2", status: "live", kickoffAt: "2026-09-04T19:30:00Z" },
+    ];
+
+    const liveMatches = mockMatches
+      .filter((m) => m.status === "live")
+      .sort((a, b) => new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime());
+
+    const finishedMatches = mockMatches
+      .filter((m) => m.status === "finished")
+      .sort((a, b) => new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime());
+
+    const focusMatches = [...liveMatches, ...finishedMatches].slice(0, 4);
+
+    expect(focusMatches.length).toBe(4);
+    // Focus matches must be: 2 live matches, followed by 2 newest finished matches
+    expect(focusMatches[0].id).toBe("m_live_1");
+    expect(focusMatches[1].id).toBe("m_live_2");
+    expect(focusMatches[2].id).toBe("m_fin_new");
+    expect(focusMatches[3].id).toBe("m_fin_mid");
+    // Scheduled future match must NOT be included in focus matches
+    expect(focusMatches.some((m) => m.id === "m_fut_1")).toBe(false);
+  });
 });

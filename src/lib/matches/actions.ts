@@ -549,6 +549,37 @@ export async function getLeaderboardAction(): Promise<LeaderboardEntry[]> {
 }
 
 /**
+ * Fetches ranking data: sorted leaderboard + up to 4 focus matches (priority LIVE, then most recently finished)
+ */
+export async function getRankingPageDataAction(): Promise<{
+  leaderboard: LeaderboardEntry[];
+  focusMatches: MatchWithTeams[];
+}> {
+  const [leaderboard, allMatches] = await Promise.all([
+    getLeaderboardAction(),
+    getMatchesWithPredictionsAction(),
+  ]);
+
+  // Priority 1: LIVE matches
+  const liveMatches = allMatches
+    .filter((m) => m.status === "live")
+    .sort((a, b) => new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime());
+
+  // Priority 2: Recently finished matches
+  const finishedMatches = allMatches
+    .filter((m) => m.status === "finished")
+    .sort((a, b) => new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime());
+
+  // Take up to 4 focus matches
+  const focusMatches = [...liveMatches, ...finishedMatches].slice(0, 4);
+
+  return {
+    leaderboard,
+    focusMatches,
+  };
+}
+
+/**
  * Fetches recent 5 matches + LIVE matches with all player predictions for matrix & mobile cards
  */
 export async function getRecentMatchesWithMatrixAction(): Promise<{
