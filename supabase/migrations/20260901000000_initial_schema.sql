@@ -790,12 +790,10 @@ BEGIN
   END IF;
 END $$;
 
--- Storage RLS on storage.objects
+-- Storage RLS on storage.objects (RLS is already enabled by Supabase by default)
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'objects') THEN
-    ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
     DROP POLICY IF EXISTS "storage_avatars_select" ON storage.objects;
     CREATE POLICY "storage_avatars_select"
     ON storage.objects FOR SELECT
