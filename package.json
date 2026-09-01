@@ -12,7 +12,10 @@
     "test:watch": "vitest",
     "test:rls": "vitest run supabase/tests",
     "db:types": "supabase gen types typescript --local > src/types/database.types.ts",
-    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts"
+    "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
+    "demo:seed": "tsx scripts/seed-demo.ts",
+    "demo:seed:full-season": "tsx scripts/seed-full-season.ts",
+    "demo:cleanup": "tsx scripts/cleanup-demo.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.1.3",

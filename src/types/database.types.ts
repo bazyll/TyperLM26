@@ -400,6 +400,7 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          config_id: string;
           first_team_id: string | null;
           top8_team_ids: string[] | null;
           out_team_ids: string[] | null;
@@ -410,6 +411,7 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
+          config_id: string;
           first_team_id?: string | null;
           top8_team_ids?: string[] | null;
           out_team_ids?: string[] | null;
@@ -420,6 +422,7 @@ export interface Database {
         Update: {
           id?: string;
           user_id?: string;
+          config_id?: string;
           first_team_id?: string | null;
           top8_team_ids?: string[] | null;
           out_team_ids?: string[] | null;
