@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "../src/types/database.types";
 import { config } from "dotenv";
-import { DEMO_USERS, DEMO_TEAMS } from "./demo-data";
+import { DEMO_USERS, DEMO_TEAM_CODES, DEMO_SPECIAL_SLUGS, DEMO_PICKEM_SEASON } from "./demo-data";
 
 config({ path: ".env.local" });
 config({ path: ".env" });
@@ -23,7 +23,7 @@ async function cleanupDemo() {
   console.log("🧹 [CLEANUP DEMO] Rozpoczynam bezpieczne usuwanie danych DEMO...");
   console.log("==================================================");
 
-  // 1. Find demo users by usernames
+  // 1. Find demo users by exact usernames (demo1..demo5)
   const demoUsernames = DEMO_USERS.map((u) => u.username);
   const { data: demoProfiles } = await adminClient
     .from("profiles")
@@ -38,7 +38,7 @@ async function cleanupDemo() {
     await adminClient.from("announcement_comments").delete().in("user_id", demoUserIds);
   }
 
-  // 3. Delete demo announcements (titled [DEMO]...) and their comments
+  // 3. Delete demo announcements (strictly titled [DEMO]...) and their comments
   const { data: demoAnnouncements } = await adminClient
     .from("announcements")
     .select("id, title")
@@ -66,14 +66,19 @@ async function cleanupDemo() {
     }
   }
 
-  // 5. Delete demo Special Predictions & Categories
-  if (demoUserIds.length > 0) {
-    await adminClient.from("special_predictions").delete().in("user_id", demoUserIds);
+  // 5. Delete demo Special Predictions & Categories (strictly matching demo slugs or [DEMO] title)
+  const { data: demoCategories } = await adminClient
+    .from("special_prediction_categories")
+    .select("id, slug")
+    .in("slug", DEMO_SPECIAL_SLUGS);
+
+  if (demoCategories && demoCategories.length > 0) {
+    const catIds = demoCategories.map((c) => c.id);
+    await adminClient.from("special_prediction_correct_answers").delete().in("category_id", catIds);
+    await adminClient.from("special_predictions").delete().in("category_id", catIds);
+    await adminClient.from("special_prediction_categories").delete().in("id", catIds);
+    console.log(`[CLEANUP] Usunięto ${catIds.length} kategorii i odpowiedzi Typów Specjalnych DEMO.`);
   }
-  await adminClient.from("special_prediction_correct_answers").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await adminClient.from("special_predictions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await adminClient.from("special_prediction_categories").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  console.log("[CLEANUP] Wyczyszczono kategorie i typy specjalne DEMO.");
 
   // 6. Delete match predictions of demo users
   if (demoUserIds.length > 0) {
@@ -81,16 +86,16 @@ async function cleanupDemo() {
     console.log("[CLEANUP] Usunięto typowania meczowe kont DEMO.");
   }
 
-  // 7. Delete demo matches
-  const demoCodes = DEMO_TEAMS.map((t) => t.code);
+  // 7. Delete demo teams (strictly matching reserved codes D01..D36) & matches & players
   const { data: demoTeams } = await adminClient
     .from("teams")
     .select("id, code")
-    .in("code", demoCodes);
+    .in("code", DEMO_TEAM_CODES);
 
   const demoTeamIds = (demoTeams || []).map((t) => t.id);
 
   if (demoTeamIds.length > 0) {
+    // Delete matches between demo teams
     const { data: demoMatches } = await adminClient
       .from("matches")
       .select("id")
@@ -103,20 +108,28 @@ async function cleanupDemo() {
       console.log(`[CLEANUP] Usunięto ${matchIds.length} meczów DEMO.`);
     }
 
-    // 8. Delete demo players
+    // Delete demo players
     await adminClient.from("players").delete().in("team_id", demoTeamIds);
     console.log("[CLEANUP] Usunięto zawodników DEMO.");
 
-    // 9. Delete demo teams
+    // Delete demo teams
     await adminClient.from("teams").delete().in("id", demoTeamIds);
-    console.log(`[CLEANUP] Usunięto ${demoTeamIds.length} drużyn DEMO.`);
+    console.log(`[CLEANUP] Usunięto ${demoTeamIds.length} drużyn DEMO (kody ${DEMO_TEAM_CODES[0]}..${DEMO_TEAM_CODES[DEMO_TEAM_CODES.length - 1]}).`);
   }
 
-  // 10. Delete demo Pick'em config
-  await adminClient.from("pickem_config").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  console.log("[CLEANUP] Usunięto konfigurację Pick'em DEMO.");
+  // 8. Delete demo Pick'em config (strictly matching DEMO season)
+  const { data: demoConfigs } = await adminClient
+    .from("pickem_config")
+    .select("id")
+    .ilike("season", "%DEMO%");
 
-  // 11. Delete demo users profiles, auth_mappings, and Auth accounts
+  if (demoConfigs && demoConfigs.length > 0) {
+    const cfgIds = demoConfigs.map((c) => c.id);
+    await adminClient.from("pickem_config").delete().in("id", cfgIds);
+    console.log(`[CLEANUP] Usunięto ${cfgIds.length} konfiguracji Pick'em DEMO (${DEMO_PICKEM_SEASON}).`);
+  }
+
+  // 9. Delete demo users profiles, auth_mappings, and Auth accounts
   for (const profile of demoProfiles || []) {
     try {
       await adminClient.from("auth_mappings").delete().eq("user_id", profile.id);
@@ -129,8 +142,8 @@ async function cleanupDemo() {
   }
 
   console.log("==================================================");
-  console.log("✨ [CLEANUP DEMO] Zakończono pomyślnie! Baza jest czysta.");
-  console.log("Konto administratora oraz dane rzeczywiste pozostały nienaruszone.");
+  console.log("✨ [CLEANUP DEMO] Zakończono pomyślnie! Baza danych została bezpiecznie oczyszczona.");
+  console.log("Konto administratora oraz wszelkie dane produkcyjne/niedemo pozostały nienaruszone.");
   console.log("==================================================");
 }
 

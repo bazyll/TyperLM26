@@ -1,15 +1,25 @@
 import { describe, it, expect } from "vitest";
-import { DEMO_TEAMS, generateFullLeagueSchedule } from "../../scripts/demo-data";
+import {
+  DEMO_TEAMS,
+  DEMO_TEAM_CODES,
+  DEMO_SPECIAL_SLUGS,
+  DEMO_PICKEM_SEASON,
+  generateFullLeagueSchedule,
+} from "../../scripts/demo-data";
 
 describe("Demo Schedule Generator & Dataset Verification", () => {
-  it("defines exactly 36 demo teams with valid attributes and players", () => {
+  it("defines exactly 36 demo teams with reserved D01..D36 codes and isolated markers", () => {
     expect(DEMO_TEAMS).toHaveLength(36);
+    expect(DEMO_TEAM_CODES).toHaveLength(36);
 
     const codes = new Set<string>();
-    for (const t of DEMO_TEAMS) {
+    for (let i = 0; i < DEMO_TEAMS.length; i++) {
+      const t = DEMO_TEAMS[i];
+      const expectedCode = `D${String(i + 1).padStart(2, "0")}`;
+      expect(t.code).toBe(expectedCode);
+
       expect(t.name).toBeTruthy();
       expect(t.short_name).toBeTruthy();
-      expect(t.code).toBeTruthy();
       expect(codes.has(t.code)).toBe(false);
       codes.add(t.code);
 
@@ -17,6 +27,15 @@ describe("Demo Schedule Generator & Dataset Verification", () => {
       expect(t.disciplinary_points).toBeGreaterThanOrEqual(0);
       expect(t.players.length).toBeGreaterThanOrEqual(2);
     }
+
+    // Check special category slugs isolation
+    expect(DEMO_SPECIAL_SLUGS).toHaveLength(6);
+    DEMO_SPECIAL_SLUGS.forEach((slug) => {
+      expect(slug.startsWith("demo-")).toBe(true);
+    });
+
+    // Check pickem season isolation
+    expect(DEMO_PICKEM_SEASON).toContain("DEMO");
   });
 
   it("generates exactly 144 matches across 8 matchdays for 36 teams", () => {

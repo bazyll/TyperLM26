@@ -1,6 +1,7 @@
 /**
  * Demo Data Definition for TyperLM26
  * 36 clubs with realistic attributes, players, and 8-round round-robin generator.
+ * Uses dedicated reserved demo codes D01..D36 to guarantee 100% isolation from real data.
  */
 
 export interface DemoTeamDef {
@@ -27,7 +28,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Real Madrid CF",
     short_name: "Real",
-    code: "RMA",
+    code: "D01",
     logo_url: "",
     uefa_coefficient: 136.0,
     disciplinary_points: 3,
@@ -40,7 +41,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Manchester City FC",
     short_name: "Man City",
-    code: "MCI",
+    code: "D02",
     logo_url: "",
     uefa_coefficient: 148.0,
     disciplinary_points: 2,
@@ -53,7 +54,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "FC Bayern München",
     short_name: "Bayern",
-    code: "BAY",
+    code: "D03",
     logo_url: "",
     uefa_coefficient: 140.0,
     disciplinary_points: 1,
@@ -66,7 +67,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Paris Saint-Germain FC",
     short_name: "PSG",
-    code: "PSG",
+    code: "D04",
     logo_url: "",
     uefa_coefficient: 116.0,
     disciplinary_points: 5,
@@ -79,7 +80,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Liverpool FC",
     short_name: "Liverpool",
-    code: "LIV",
+    code: "D05",
     logo_url: "",
     uefa_coefficient: 114.0,
     disciplinary_points: 2,
@@ -92,7 +93,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "FC Internazionale Milano",
     short_name: "Inter",
-    code: "INT",
+    code: "D06",
     logo_url: "",
     uefa_coefficient: 101.0,
     disciplinary_points: 4,
@@ -105,7 +106,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Borussia Dortmund",
     short_name: "Dortmund",
-    code: "BVB",
+    code: "D07",
     logo_url: "",
     uefa_coefficient: 97.0,
     disciplinary_points: 3,
@@ -118,7 +119,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "RB Leipzig",
     short_name: "Leipzig",
-    code: "RBL",
+    code: "D08",
     logo_url: "",
     uefa_coefficient: 97.0,
     disciplinary_points: 2,
@@ -131,7 +132,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "FC Barcelona",
     short_name: "Barça",
-    code: "BAR",
+    code: "D09",
     logo_url: "",
     uefa_coefficient: 91.0,
     disciplinary_points: 6,
@@ -144,7 +145,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Bayer 04 Leverkusen",
     short_name: "Leverkusen",
-    code: "B04",
+    code: "D10",
     logo_url: "",
     uefa_coefficient: 90.0,
     disciplinary_points: 2,
@@ -157,7 +158,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Club Atlético de Madrid",
     short_name: "Atlético",
-    code: "ATM",
+    code: "D11",
     logo_url: "",
     uefa_coefficient: 89.0,
     disciplinary_points: 8,
@@ -170,7 +171,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Atalanta BC",
     short_name: "Atalanta",
-    code: "ATA",
+    code: "D12",
     logo_url: "",
     uefa_coefficient: 81.0,
     disciplinary_points: 4,
@@ -183,7 +184,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Juventus FC",
     short_name: "Juventus",
-    code: "JUV",
+    code: "D13",
     logo_url: "",
     uefa_coefficient: 80.0,
     disciplinary_points: 5,
@@ -196,7 +197,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "SL Benfica",
     short_name: "Benfica",
-    code: "SLB",
+    code: "D14",
     logo_url: "",
     uefa_coefficient: 79.0,
     disciplinary_points: 3,
@@ -209,7 +210,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Arsenal FC",
     short_name: "Arsenal",
-    code: "ARS",
+    code: "D15",
     logo_url: "",
     uefa_coefficient: 72.0,
     disciplinary_points: 2,
@@ -222,7 +223,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Club Brugge KV",
     short_name: "Brugge",
-    code: "CLU",
+    code: "D16",
     logo_url: "",
     uefa_coefficient: 64.0,
     disciplinary_points: 4,
@@ -235,7 +236,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Sporting Clube de Portugal",
     short_name: "Sporting",
-    code: "SCP",
+    code: "D17",
     logo_url: "",
     uefa_coefficient: 54.5,
     disciplinary_points: 3,
@@ -248,7 +249,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Feyenoord Rotterdam",
     short_name: "Feyenoord",
-    code: "FEY",
+    code: "D18",
     logo_url: "",
     uefa_coefficient: 57.0,
     disciplinary_points: 5,
@@ -261,7 +262,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "AC Milan",
     short_name: "Milan",
-    code: "MIL",
+    code: "D19",
     logo_url: "",
     uefa_coefficient: 59.0,
     disciplinary_points: 4,
@@ -274,7 +275,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "PSV Eindhoven",
     short_name: "PSV",
-    code: "PSV",
+    code: "D20",
     logo_url: "",
     uefa_coefficient: 54.0,
     disciplinary_points: 2,
@@ -287,7 +288,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "GNK Dinamo Zagreb",
     short_name: "Dinamo",
-    code: "DIN",
+    code: "D21",
     logo_url: "",
     uefa_coefficient: 50.0,
     disciplinary_points: 6,
@@ -300,7 +301,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "FC Salzburg",
     short_name: "Salzburg",
-    code: "SAL",
+    code: "D22",
     logo_url: "",
     uefa_coefficient: 50.0,
     disciplinary_points: 3,
@@ -313,7 +314,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Lille OSC",
     short_name: "Lille",
-    code: "LOS",
+    code: "D23",
     logo_url: "",
     uefa_coefficient: 47.0,
     disciplinary_points: 3,
@@ -326,7 +327,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "FK Crvena Zvezda",
     short_name: "Zvezda",
-    code: "CRV",
+    code: "D24",
     logo_url: "",
     uefa_coefficient: 40.0,
     disciplinary_points: 7,
@@ -339,7 +340,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "BSC Young Boys Bern",
     short_name: "Young Boys",
-    code: "YBB",
+    code: "D25",
     logo_url: "",
     uefa_coefficient: 34.5,
     disciplinary_points: 4,
@@ -352,7 +353,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Celtic FC",
     short_name: "Celtic",
-    code: "CEL",
+    code: "D26",
     logo_url: "",
     uefa_coefficient: 32.0,
     disciplinary_points: 5,
@@ -365,7 +366,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "ŠK Slovan Bratislava",
     short_name: "Slovan",
-    code: "SLO",
+    code: "D27",
     logo_url: "",
     uefa_coefficient: 30.5,
     disciplinary_points: 6,
@@ -378,7 +379,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "AS Monaco FC",
     short_name: "Monaco",
-    code: "ASM",
+    code: "D28",
     logo_url: "",
     uefa_coefficient: 24.0,
     disciplinary_points: 3,
@@ -391,7 +392,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "AC Sparta Praha",
     short_name: "Sparta",
-    code: "SPA",
+    code: "D29",
     logo_url: "",
     uefa_coefficient: 22.5,
     disciplinary_points: 4,
@@ -404,7 +405,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Aston Villa FC",
     short_name: "Aston Villa",
-    code: "AVL",
+    code: "D30",
     logo_url: "",
     uefa_coefficient: 20.8,
     disciplinary_points: 2,
@@ -417,7 +418,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Bologna FC 1909",
     short_name: "Bologna",
-    code: "BOL",
+    code: "D31",
     logo_url: "",
     uefa_coefficient: 18.0,
     disciplinary_points: 3,
@@ -430,7 +431,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Girona FC",
     short_name: "Girona",
-    code: "GIR",
+    code: "D32",
     logo_url: "",
     uefa_coefficient: 17.5,
     disciplinary_points: 3,
@@ -443,7 +444,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "VfB Stuttgart 1893",
     short_name: "Stuttgart",
-    code: "VFB",
+    code: "D33",
     logo_url: "",
     uefa_coefficient: 17.0,
     disciplinary_points: 2,
@@ -456,7 +457,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "SK Sturm Graz",
     short_name: "Sturm",
-    code: "STU",
+    code: "D34",
     logo_url: "",
     uefa_coefficient: 14.5,
     disciplinary_points: 5,
@@ -469,7 +470,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "Stade Brestois 29",
     short_name: "Brest",
-    code: "BRE",
+    code: "D35",
     logo_url: "",
     uefa_coefficient: 13.0,
     disciplinary_points: 2,
@@ -482,7 +483,7 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
   {
     name: "FC Shakhtar Donetsk",
     short_name: "Shakhtar",
-    code: "SHK",
+    code: "D36",
     logo_url: "",
     uefa_coefficient: 63.0,
     disciplinary_points: 4,
@@ -493,6 +494,17 @@ export const DEMO_TEAMS: DemoTeamDef[] = [
     ],
   },
 ];
+
+export const DEMO_TEAM_CODES = DEMO_TEAMS.map((t) => t.code);
+export const DEMO_SPECIAL_SLUGS = [
+  "demo-ucl-winner",
+  "demo-ucl-finalist",
+  "demo-top-scorer",
+  "demo-top-assister",
+  "demo-most-goals-team",
+  "demo-most-clean-sheets",
+];
+export const DEMO_PICKEM_SEASON = "2026/2027 DEMO";
 
 /**
  * Standard Polygon Algorithm to generate exactly 8 rounds of 18 matches

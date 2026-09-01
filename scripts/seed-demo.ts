@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "../src/types/database.types";
 import { config } from "dotenv";
-import { DEMO_USERS, DEMO_TEAMS } from "./demo-data";
+import { DEMO_USERS, DEMO_TEAMS, DEMO_SPECIAL_SLUGS, DEMO_PICKEM_SEASON } from "./demo-data";
 import { calculateMatchScore } from "../src/lib/scoring/matches";
 
 config({ path: ".env.local" });
@@ -45,8 +45,8 @@ async function seedDemo() {
     return;
   }
 
-  // 2. Seed 36 Teams & Players
-  console.log("⚽ Tworzenie 36 klubów i zawodników...");
+  // 2. Seed 36 Teams & Players with reserved D01..D36 codes
+  console.log("⚽ Tworzenie 36 klubów i zawodników (z kodami D01..D36)...");
   const teamIdMap = new Map<string, string>(); // code -> id
   const playerList: Array<{ id: string; team_id: string; name: string }> = [];
 
@@ -128,30 +128,30 @@ async function seedDemo() {
 
   const matchSpecs = [
     // Finished matches (8-10 with diverse results)
-    { home: "RMA", away: "BVB", homeScore: 3, awayScore: 1, status: "finished" as const, kickoffOffset: -72 * 3600 * 1000 },
-    { home: "BAY", away: "PSG", homeScore: 0, awayScore: 2, status: "finished" as const, kickoffOffset: -70 * 3600 * 1000 },
-    { home: "MCI", away: "INT", homeScore: 2, awayScore: 2, status: "finished" as const, kickoffOffset: -48 * 3600 * 1000 },
-    { home: "LIV", away: "ATM", homeScore: 0, awayScore: 0, status: "finished" as const, kickoffOffset: -46 * 3600 * 1000 },
-    { home: "BAR", away: "B04", homeScore: 4, awayScore: 3, status: "finished" as const, kickoffOffset: -24 * 3600 * 1000 },
-    { home: "ARS", away: "JUV", homeScore: 1, awayScore: 0, status: "finished" as const, kickoffOffset: -22 * 3600 * 1000 },
-    { home: "ATA", away: "SLB", homeScore: 2, awayScore: 1, status: "finished" as const, kickoffOffset: -20 * 3600 * 1000 },
-    { home: "MIL", away: "RBL", homeScore: 1, awayScore: 3, status: "finished" as const, kickoffOffset: -18 * 3600 * 1000 },
-    { home: "SCP", away: "PSV", homeScore: 1, awayScore: 1, status: "finished" as const, kickoffOffset: -12 * 3600 * 1000 },
+    { home: "D01", away: "D07", homeScore: 3, awayScore: 1, status: "finished" as const, kickoffOffset: -72 * 3600 * 1000 },
+    { home: "D03", away: "D04", homeScore: 0, awayScore: 2, status: "finished" as const, kickoffOffset: -70 * 3600 * 1000 },
+    { home: "D02", away: "D06", homeScore: 2, awayScore: 2, status: "finished" as const, kickoffOffset: -48 * 3600 * 1000 },
+    { home: "D05", away: "D11", homeScore: 0, awayScore: 0, status: "finished" as const, kickoffOffset: -46 * 3600 * 1000 },
+    { home: "D09", away: "D10", homeScore: 4, awayScore: 3, status: "finished" as const, kickoffOffset: -24 * 3600 * 1000 },
+    { home: "D15", away: "D13", homeScore: 1, awayScore: 0, status: "finished" as const, kickoffOffset: -22 * 3600 * 1000 },
+    { home: "D12", away: "D14", homeScore: 2, awayScore: 1, status: "finished" as const, kickoffOffset: -20 * 3600 * 1000 },
+    { home: "D19", away: "D08", homeScore: 1, awayScore: 3, status: "finished" as const, kickoffOffset: -18 * 3600 * 1000 },
+    { home: "D17", away: "D20", homeScore: 1, awayScore: 1, status: "finished" as const, kickoffOffset: -12 * 3600 * 1000 },
 
     // Live matches (2 matches)
-    { home: "CLU", away: "SAL", homeScore: 1, awayScore: 0, status: "live" as const, minute: 34, kickoffOffset: -40 * 60 * 1000 },
-    { home: "FEY", away: "LOS", homeScore: 2, awayScore: 2, status: "live" as const, minute: 78, kickoffOffset: -85 * 60 * 1000 },
+    { home: "D16", away: "D22", homeScore: 1, awayScore: 0, status: "live" as const, minute: 34, kickoffOffset: -40 * 60 * 1000 },
+    { home: "D18", away: "D23", homeScore: 2, awayScore: 2, status: "live" as const, minute: 78, kickoffOffset: -85 * 60 * 1000 },
 
     // Upcoming matches (relative to now)
-    { home: "AVL", away: "BOL", homeScore: null, awayScore: null, status: "scheduled" as const, minute: null, kickoffOffset: 30 * 60 * 1000 }, // +30m
-    { home: "GIR", away: "VFB", homeScore: null, awayScore: null, status: "scheduled" as const, minute: null, kickoffOffset: 24 * 3600 * 1000 }, // tomorrow
-    { home: "ASM", away: "DIN", homeScore: null, awayScore: null, status: "scheduled" as const, minute: null, kickoffOffset: 26 * 3600 * 1000 }, // tomorrow
-    { home: "CEL", away: "CRV", homeScore: null, awayScore: null, status: "scheduled" as const, minute: null, kickoffOffset: 72 * 3600 * 1000 }, // in 3 days
-    { home: "YBB", away: "SPA", homeScore: null, awayScore: null, status: "scheduled" as const, minute: null, kickoffOffset: 74 * 3600 * 1000 }, // in 3 days
+    { home: "D30", away: "D31", homeScore: null, awayScore: null, status: "scheduled" as const, minute: null, kickoffOffset: 30 * 60 * 1000 }, // +30m
+    { home: "D32", away: "D33", homeScore: null, awayScore: null, status: "scheduled" as const, minute: null, kickoffOffset: 24 * 3600 * 1000 }, // tomorrow
+    { home: "D28", away: "D21", homeScore: null, awayScore: null, status: "scheduled" as const, minute: null, kickoffOffset: 26 * 3600 * 1000 }, // tomorrow
+    { home: "D26", away: "D24", homeScore: null, awayScore: null, status: "scheduled" as const, minute: null, kickoffOffset: 72 * 3600 * 1000 }, // in 3 days
+    { home: "D25", away: "D29", homeScore: null, awayScore: null, status: "scheduled" as const, minute: null, kickoffOffset: 74 * 3600 * 1000 }, // in 3 days
 
     // Postponed & Cancelled
-    { home: "STU", away: "SLO", homeScore: null, awayScore: null, status: "postponed" as const, minute: null, kickoffOffset: 48 * 3600 * 1000 },
-    { home: "BRE", away: "SHK", homeScore: null, awayScore: null, status: "cancelled" as const, minute: null, kickoffOffset: 50 * 3600 * 1000 },
+    { home: "D34", away: "D27", homeScore: null, awayScore: null, status: "postponed" as const, minute: null, kickoffOffset: 48 * 3600 * 1000 },
+    { home: "D35", away: "D36", homeScore: null, awayScore: null, status: "cancelled" as const, minute: null, kickoffOffset: 50 * 3600 * 1000 },
   ];
 
   const createdMatches: Array<{
@@ -323,12 +323,12 @@ async function seedDemo() {
   }
   console.log("✓ Zapisano i przeliczono typowania meczowe dla kont demo.");
 
-  // 6. Seed Special Predictions Categories & Selections
-  console.log("🏆 Tworzenie 6 kategorii Typów Specjalnych...");
+  // 6. Seed Special Predictions Categories (with distinct demo slugs)
+  console.log("🏆 Tworzenie 6 kategorii Typów Specjalnych (z prefiksem demo-)...");
   const specCategories = [
     {
-      slug: "ucl-winner",
-      title: "Zwycięzca Ligi Mistrzów 2026/27",
+      slug: "demo-ucl-winner",
+      title: "[DEMO] Zwycięzca Ligi Mistrzów 2026/27",
       description: "Wskaż triumfatora finału UEFA Champions League.",
       target_type: "team" as const,
       points_value: 20,
@@ -337,8 +337,8 @@ async function seedDemo() {
       is_locked: false,
     },
     {
-      slug: "ucl-finalist",
-      title: "Finalista Ligi Mistrzów 2026/27",
+      slug: "demo-ucl-finalist",
+      title: "[DEMO] Finalista Ligi Mistrzów 2026/27",
       description: "Wskaż drugiego finalistę (wicemistrza / przegranego w finale).",
       target_type: "team" as const,
       points_value: 20,
@@ -347,8 +347,8 @@ async function seedDemo() {
       is_locked: false,
     },
     {
-      slug: "top-scorer",
-      title: "Król Strzelców Champions League",
+      slug: "demo-top-scorer",
+      title: "[DEMO] Król Strzelców Champions League",
       description: "Zawodnik z największą liczbą goli na koniec turnieju.",
       target_type: "player" as const,
       points_value: 20,
@@ -357,8 +357,8 @@ async function seedDemo() {
       is_locked: false,
     },
     {
-      slug: "top-assister",
-      title: "Król Asyst Champions League",
+      slug: "demo-top-assister",
+      title: "[DEMO] Król Asyst Champions League",
       description: "Zawodnik z największą liczbą asyst.",
       target_type: "player" as const,
       points_value: 20,
@@ -367,8 +367,8 @@ async function seedDemo() {
       is_locked: true,
     },
     {
-      slug: "most-goals-team",
-      title: "Najwięcej strzelonych goli (Drużyna)",
+      slug: "demo-most-goals-team",
+      title: "[DEMO] Najwięcej strzelonych goli (Drużyna)",
       description: "Klub z największą łączną liczbą bramek.",
       target_type: "team" as const,
       points_value: 20,
@@ -377,8 +377,8 @@ async function seedDemo() {
       is_locked: true,
     },
     {
-      slug: "most-clean-sheets",
-      title: "Najwięcej czystych kont (Faza Ligowa)",
+      slug: "demo-most-clean-sheets",
+      title: "[DEMO] Najwięcej czystych kont (Faza Ligowa)",
       description: "Drużyna z największą liczbą czystych kont.",
       target_type: "team" as const,
       points_value: 20,
@@ -388,7 +388,7 @@ async function seedDemo() {
     },
   ];
 
-  const catIdMap = new Map<string, string>(); // slug -> id
+  const catIdMap = new Map<string, string>();
   for (const cat of specCategories) {
     const { data: catRow, error: catErr } = await adminClient
       .from("special_prediction_categories")
@@ -409,9 +409,9 @@ async function seedDemo() {
     catIdMap.set(cat.slug, catRow.id);
   }
 
-  // Set correct answer for settled category (most-clean-sheets -> Arsenal FC)
-  const settledCatId = catIdMap.get("most-clean-sheets");
-  const correctArsenalId = teamIdMap.get("ARS");
+  // Set correct answer for settled category (demo-most-clean-sheets -> Arsenal FC D15)
+  const settledCatId = catIdMap.get("demo-most-clean-sheets");
+  const correctArsenalId = teamIdMap.get("D15");
   if (settledCatId && correctArsenalId) {
     await adminClient.from("special_prediction_correct_answers").insert({
       category_id: settledCatId,
@@ -420,10 +420,10 @@ async function seedDemo() {
   }
 
   // Seed user predictions for special categories
-  const rmaId = teamIdMap.get("RMA");
-  const mciId = teamIdMap.get("MCI");
-  const bayId = teamIdMap.get("BAY");
-  const arsId = teamIdMap.get("ARS");
+  const rmaId = teamIdMap.get("D01");
+  const mciId = teamIdMap.get("D02");
+  const bayId = teamIdMap.get("D03");
+  const arsId = teamIdMap.get("D15");
   const mbappe = playerList.find((p) => p.name.includes("Mbappé"))?.id;
   const haaland = playerList.find((p) => p.name.includes("Haaland"))?.id;
   const kdb = playerList.find((p) => p.name.includes("De Bruyne"))?.id;
@@ -436,37 +436,37 @@ async function seedDemo() {
     pointsAwarded?: number;
   }> = [
     // Winner
-    { username: "demo1", catSlug: "ucl-winner", teamId: rmaId },
-    { username: "demo2", catSlug: "ucl-winner", teamId: mciId },
-    { username: "demo3", catSlug: "ucl-winner", teamId: bayId },
-    { username: "demo4", catSlug: "ucl-winner", teamId: arsId },
-    { username: "demo5", catSlug: "ucl-winner", teamId: rmaId },
+    { username: "demo1", catSlug: "demo-ucl-winner", teamId: rmaId },
+    { username: "demo2", catSlug: "demo-ucl-winner", teamId: mciId },
+    { username: "demo3", catSlug: "demo-ucl-winner", teamId: bayId },
+    { username: "demo4", catSlug: "demo-ucl-winner", teamId: arsId },
+    { username: "demo5", catSlug: "demo-ucl-winner", teamId: rmaId },
 
     // Finalist
-    { username: "demo1", catSlug: "ucl-finalist", teamId: mciId },
-    { username: "demo2", catSlug: "ucl-finalist", teamId: rmaId },
-    { username: "demo3", catSlug: "ucl-finalist", teamId: arsId },
-    { username: "demo4", catSlug: "ucl-finalist", teamId: bayId },
-    { username: "demo5", catSlug: "ucl-finalist", teamId: mciId },
+    { username: "demo1", catSlug: "demo-ucl-finalist", teamId: mciId },
+    { username: "demo2", catSlug: "demo-ucl-finalist", teamId: rmaId },
+    { username: "demo3", catSlug: "demo-ucl-finalist", teamId: arsId },
+    { username: "demo4", catSlug: "demo-ucl-finalist", teamId: bayId },
+    { username: "demo5", catSlug: "demo-ucl-finalist", teamId: mciId },
 
     // Top Scorer
-    { username: "demo1", catSlug: "top-scorer", playerId: mbappe },
-    { username: "demo2", catSlug: "top-scorer", playerId: haaland },
-    { username: "demo3", catSlug: "top-scorer", playerId: mbappe },
-    { username: "demo4", catSlug: "top-scorer", playerId: haaland },
-    { username: "demo5", catSlug: "top-scorer", playerId: mbappe },
+    { username: "demo1", catSlug: "demo-top-scorer", playerId: mbappe },
+    { username: "demo2", catSlug: "demo-top-scorer", playerId: haaland },
+    { username: "demo3", catSlug: "demo-top-scorer", playerId: mbappe },
+    { username: "demo4", catSlug: "demo-top-scorer", playerId: haaland },
+    { username: "demo5", catSlug: "demo-top-scorer", playerId: mbappe },
 
     // Top Assister
-    { username: "demo1", catSlug: "top-assister", playerId: kdb },
-    { username: "demo2", catSlug: "top-assister", playerId: kdb },
-    { username: "demo3", catSlug: "top-assister", playerId: kdb },
+    { username: "demo1", catSlug: "demo-top-assister", playerId: kdb },
+    { username: "demo2", catSlug: "demo-top-assister", playerId: kdb },
+    { username: "demo3", catSlug: "demo-top-assister", playerId: kdb },
 
-    // Settled Category: most-clean-sheets (Arsenal correct -> demo1 and demo4 get +20 pts)
-    { username: "demo1", catSlug: "most-clean-sheets", teamId: arsId, pointsAwarded: 20 },
-    { username: "demo2", catSlug: "most-clean-sheets", teamId: mciId, pointsAwarded: 0 },
-    { username: "demo3", catSlug: "most-clean-sheets", teamId: rmaId, pointsAwarded: 0 },
-    { username: "demo4", catSlug: "most-clean-sheets", teamId: arsId, pointsAwarded: 20 },
-    { username: "demo5", catSlug: "most-clean-sheets", teamId: bayId, pointsAwarded: 0 },
+    // Settled Category: demo-most-clean-sheets (Arsenal D15 correct -> demo1 and demo4 get +20 pts)
+    { username: "demo1", catSlug: "demo-most-clean-sheets", teamId: arsId, pointsAwarded: 20 },
+    { username: "demo2", catSlug: "demo-most-clean-sheets", teamId: mciId, pointsAwarded: 0 },
+    { username: "demo3", catSlug: "demo-most-clean-sheets", teamId: rmaId, pointsAwarded: 0 },
+    { username: "demo4", catSlug: "demo-most-clean-sheets", teamId: arsId, pointsAwarded: 20 },
+    { username: "demo5", catSlug: "demo-most-clean-sheets", teamId: bayId, pointsAwarded: 0 },
   ];
 
   for (const dsp of demoSpecPicks) {
@@ -484,12 +484,12 @@ async function seedDemo() {
   }
   console.log("✓ Skonfigurowano i rozliczono typy specjalne demo.");
 
-  // 7. Seed Pick'em Config & Submissions
-  console.log("🧩 Tworzenie konfiguracji Pick'em oraz zestawów demo userów...");
+  // 7. Seed Pick'em Config & Submissions (with DEMO season marker)
+  console.log(`🧩 Tworzenie konfiguracji Pick'em (${DEMO_PICKEM_SEASON}) oraz zestawów demo userów...`);
   const { data: pickemCfg, error: cfgErr } = await adminClient
     .from("pickem_config")
     .insert({
-      season: "2026/2027",
+      season: DEMO_PICKEM_SEASON,
       deadline_at: new Date(now + 5 * 24 * 3600 * 1000).toISOString(),
       status: "open",
       is_locked: false,
@@ -509,8 +509,8 @@ async function seedDemo() {
     // Shift team array for distinct picks per user
     const rotated = [...allTeamIds.slice(uIdx), ...allTeamIds.slice(0, uIdx)];
     const firstTeamId = rotated[0];
-    const top8TeamIds = rotated.slice(1, 8); // 7 teams
-    const outTeamIds = rotated.slice(28, 36); // 8 teams
+    const top8TeamIds = rotated.slice(1, 8);
+    const outTeamIds = rotated.slice(28, 36);
 
     const { data: subRow, error: subErr } = await adminClient
       .from("pickem_submissions")
@@ -527,7 +527,6 @@ async function seedDemo() {
 
     if (subErr || !subRow) throw new Error(`Błąd zapisu Pick'em dla ${userDef.username}: ${subErr?.message}`);
 
-    // Insert 16 explicit selections (first, top8, out)
     const selectionsPayload = [
       { submission_id: subRow.id, team_id: firstTeamId, category: "first" as const },
       ...top8TeamIds.map((tId) => ({ submission_id: subRow.id, team_id: tId, category: "top8" as const })),
@@ -600,6 +599,11 @@ async function seedDemo() {
 
   console.log("==================================================");
   console.log("🎉 [SEED DEMO] Zakończono pomyślnie!");
+  console.log("Wszystkie dane zostały oznaczone bezpiecznymi markerami DEMO:");
+  console.log("• Kody drużyn: D01..D36");
+  console.log(`• Sezon Pick'em: ${DEMO_PICKEM_SEASON}`);
+  console.log("• Slugi kategorii specjalnych: demo-*");
+  console.log("• Tytuły ogłoszeń: [DEMO] *");
   console.log("Utworzone konta demonstracyjne (hasło z DEMO_USER_PASSWORD w .env.local):");
   DEMO_USERS.forEach((u) => console.log(`• @${u.username} (${u.firstName} ${u.lastName})`));
   console.log("==================================================");

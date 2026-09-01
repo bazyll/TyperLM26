@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "../src/types/database.types";
 import { config } from "dotenv";
-import { DEMO_USERS, DEMO_TEAMS, generateFullLeagueSchedule } from "./demo-data";
+import { DEMO_USERS, DEMO_TEAMS, DEMO_PICKEM_SEASON, generateFullLeagueSchedule } from "./demo-data";
 import { calculateMatchScore } from "../src/lib/scoring/matches";
 
 config({ path: ".env.local" });
@@ -45,8 +45,8 @@ async function seedFullSeason() {
     return;
   }
 
-  // 2. Seed 36 Teams & Players
-  console.log("⚽ Tworzenie 36 klubów i zawodników...");
+  // 2. Seed 36 Teams & Players with reserved D01..D36 codes
+  console.log("⚽ Tworzenie 36 klubów i zawodników (kody D01..D36)...");
   const teamIdMap = new Map<string, string>(); // code -> id
   const playerList: Array<{ id: string; team_id: string; name: string }> = [];
 
@@ -207,15 +207,15 @@ async function seedFullSeason() {
   }
   console.log("✓ Zapisano typowania meczowe.");
 
-  // 6. Seed Special Predictions Categories
+  // 6. Seed Special Predictions Categories (with distinct demo- slugs)
   console.log("🏆 Tworzenie 6 kategorii Typów Specjalnych...");
   const specCategories = [
-    { slug: "ucl-winner", title: "Zwycięzca Ligi Mistrzów 2026/27", target_type: "team" as const, points_value: 20, deadline_at: new Date(now + 7 * 24 * 3600 * 1000).toISOString(), status: "open" as const, is_locked: false },
-    { slug: "ucl-finalist", title: "Finalista Ligi Mistrzów 2026/27", target_type: "team" as const, points_value: 20, deadline_at: new Date(now + 7 * 24 * 3600 * 1000).toISOString(), status: "open" as const, is_locked: false },
-    { slug: "top-scorer", title: "Król Strzelców Champions League", target_type: "player" as const, points_value: 20, deadline_at: new Date(now + 7 * 24 * 3600 * 1000).toISOString(), status: "open" as const, is_locked: false },
-    { slug: "top-assister", title: "Król Asyst Champions League", target_type: "player" as const, points_value: 20, deadline_at: new Date(now - 24 * 3600 * 1000).toISOString(), status: "locked" as const, is_locked: true },
-    { slug: "most-goals-team", title: "Najwięcej strzelonych goli (Drużyna)", target_type: "team" as const, points_value: 20, deadline_at: new Date(now - 24 * 3600 * 1000).toISOString(), status: "locked" as const, is_locked: true },
-    { slug: "most-clean-sheets", title: "Najwięcej czystych kont (Faza Ligowa)", target_type: "team" as const, points_value: 20, deadline_at: new Date(now - 48 * 3600 * 1000).toISOString(), status: "settled" as const, is_locked: true },
+    { slug: "demo-ucl-winner", title: "[DEMO] Zwycięzca Ligi Mistrzów 2026/27", target_type: "team" as const, points_value: 20, deadline_at: new Date(now + 7 * 24 * 3600 * 1000).toISOString(), status: "open" as const, is_locked: false },
+    { slug: "demo-ucl-finalist", title: "[DEMO] Finalista Ligi Mistrzów 2026/27", target_type: "team" as const, points_value: 20, deadline_at: new Date(now + 7 * 24 * 3600 * 1000).toISOString(), status: "open" as const, is_locked: false },
+    { slug: "demo-top-scorer", title: "[DEMO] Król Strzelców Champions League", target_type: "player" as const, points_value: 20, deadline_at: new Date(now + 7 * 24 * 3600 * 1000).toISOString(), status: "open" as const, is_locked: false },
+    { slug: "demo-top-assister", title: "[DEMO] Król Asyst Champions League", target_type: "player" as const, points_value: 20, deadline_at: new Date(now - 24 * 3600 * 1000).toISOString(), status: "locked" as const, is_locked: true },
+    { slug: "demo-most-goals-team", title: "[DEMO] Najwięcej strzelonych goli (Drużyna)", target_type: "team" as const, points_value: 20, deadline_at: new Date(now - 24 * 3600 * 1000).toISOString(), status: "locked" as const, is_locked: true },
+    { slug: "demo-most-clean-sheets", title: "[DEMO] Najwięcej czystych kont (Faza Ligowa)", target_type: "team" as const, points_value: 20, deadline_at: new Date(now - 48 * 3600 * 1000).toISOString(), status: "settled" as const, is_locked: true },
   ];
 
   const catIdMap = new Map<string, string>();
@@ -240,11 +240,11 @@ async function seedFullSeason() {
   }
 
   // 7. Seed Pick'em Config & Submissions (locked and ready for Admin Settlement)
-  console.log("🧩 Tworzenie konfiguracji Pick'em oraz zestawów demo userów...");
+  console.log(`🧩 Tworzenie konfiguracji Pick'em (${DEMO_PICKEM_SEASON}) oraz zestawów demo userów...`);
   const { data: pickemCfg, error: cfgErr } = await adminClient
     .from("pickem_config")
     .insert({
-      season: "2026/2027",
+      season: DEMO_PICKEM_SEASON,
       deadline_at: new Date(now - 24 * 3600 * 1000).toISOString(),
       status: "locked",
       is_locked: true,
@@ -300,10 +300,10 @@ async function seedFullSeason() {
 
   console.log("==================================================");
   console.log("🎉 [SEED FULL SEASON] Zakończono pomyślnie!");
-  console.log("• Utworzono 36 drużyn");
+  console.log("• Utworzono 36 drużyn z kodami D01..D36");
   console.log("• Utworzono dokładnie 144 zakończone mecze (8 meczów na drużynę)");
   console.log("• Tabela Ligi Mistrzów (/tabela) jest w 100% gotowa");
-  console.log("• Pick'em jest przygotowany do kliknięcia 'Rozlicz Pick'em' w Panelu Admina (/admin)");
+  console.log(`• Pick'em (${DEMO_PICKEM_SEASON}) jest przygotowany do kliknięcia 'Rozlicz Pick'em' w Panelu Admina (/admin)`);
   console.log("==================================================");
 }
 
