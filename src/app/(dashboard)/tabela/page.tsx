@@ -1,6 +1,6 @@
 import { getUCLTableAction } from "@/lib/table/actions";
 import { Table as TableIcon, Info, Sparkles } from "lucide-react";
-import Image from "next/image";
+import { TeamLogo } from "@/components/team-logo";
 
 export const dynamic = "force-dynamic";
 
@@ -109,13 +109,13 @@ export default async function TablePage() {
                   {/* Team with Crest */}
                   <td className="py-2.5 px-3 sm:px-4">
                     <div className="flex items-center gap-2.5">
-                      <div className="relative w-5 h-5 sm:w-6 sm:h-6 shrink-0">
-                        <Image
-                          src={row.team.logoUrl}
-                          alt={row.team.name}
-                          fill
-                          className="object-contain"
-                          unoptimized
+                      <div className="relative w-5 h-5 sm:w-6 sm:h-6 shrink-0 flex items-center justify-center">
+                        <TeamLogo
+                          logoUrl={row.team.logoUrl}
+                          teamName={row.team.name}
+                          teamCode={row.team.code}
+                          size={24}
+                          className="w-full h-full object-contain"
                         />
                       </div>
                       <span className="font-bold text-white truncate max-w-[130px] sm:max-w-none">

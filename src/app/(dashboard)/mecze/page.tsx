@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import Image from "next/image";
+import { TeamLogo } from "@/components/team-logo";
 import {
   Calendar,
   Clock,
@@ -266,7 +266,13 @@ export default function MatchesPage() {
                       {match.homeTeam.name}
                     </span>
                     <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-[#162444] border border-[#182645] flex items-center justify-center p-2 shrink-0 relative">
-                      <Image src={match.homeTeam.logoUrl} alt={match.homeTeam.code} width={48} height={48} unoptimized className="w-full h-full object-contain" />
+                      <TeamLogo
+                        logoUrl={match.homeTeam.logoUrl}
+                        teamName={match.homeTeam.name}
+                        teamCode={match.homeTeam.code}
+                        size={48}
+                        className="w-full h-full object-contain"
+                      />
                     </div>
                   </div>
 
@@ -284,7 +290,13 @@ export default function MatchesPage() {
                   {/* Away Team */}
                   <div className="flex-1 flex items-center justify-start gap-3.5 w-full md:w-auto text-left">
                     <div className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-[#162444] border border-[#182645] flex items-center justify-center p-2 shrink-0 relative">
-                      <Image src={match.awayTeam.logoUrl} alt={match.awayTeam.code} width={48} height={48} unoptimized className="w-full h-full object-contain" />
+                      <TeamLogo
+                        logoUrl={match.awayTeam.logoUrl}
+                        teamName={match.awayTeam.name}
+                        teamCode={match.awayTeam.code}
+                        size={48}
+                        className="w-full h-full object-contain"
+                      />
                     </div>
                     <span className="text-base sm:text-lg font-bold text-white tracking-tight">
                       {match.awayTeam.name}

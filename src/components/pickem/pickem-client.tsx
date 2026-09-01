@@ -16,7 +16,7 @@ import {
   Loader2,
   ChevronRight,
 } from "lucide-react";
-import Image from "next/image";
+import { TeamLogo } from "@/components/team-logo";
 
 type TeamRow = Database["public"]["Tables"]["teams"]["Row"];
 type ConfigRow = Database["public"]["Tables"]["pickem_config"]["Row"];
@@ -307,8 +307,14 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
               {/* Club Header */}
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="relative w-8 h-8 shrink-0">
-                    <Image src={team.logo_url} alt={team.name} fill className="object-contain" unoptimized />
+                  <div className="relative w-8 h-8 shrink-0 flex items-center justify-center">
+                    <TeamLogo
+                      logoUrl={team.logo_url}
+                      teamName={team.name}
+                      teamCode={team.code}
+                      size={32}
+                      className="w-full h-full object-contain"
+                    />
                   </div>
                   <div className="truncate">
                     <span className="text-sm font-bold text-white block truncate">{team.name}</span>

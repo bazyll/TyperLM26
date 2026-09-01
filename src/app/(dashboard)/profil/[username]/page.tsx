@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserProfile } from "@/lib/auth/actions";
 import { getUserStatsAction, getLeaderboardAction } from "@/lib/matches/actions";
 import { Database } from "@/types/database.types";
-import Image from "next/image";
+import { TeamLogo } from "@/components/team-logo";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type PredictionRow = Database["public"]["Tables"]["predictions"]["Row"];
@@ -172,8 +172,14 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                     <div className="mt-1 flex items-center gap-2">
                       {team ? (
                         <>
-                          <div className="relative w-5 h-5 shrink-0">
-                            <Image src={team.logo_url} alt="" fill className="object-contain" unoptimized />
+                          <div className="relative w-5 h-5 shrink-0 flex items-center justify-center">
+                            <TeamLogo
+                              logoUrl={team.logo_url}
+                              teamName={team.name}
+                              teamCode={team.code}
+                              size={20}
+                              className="w-full h-full object-contain"
+                            />
                           </div>
                           <span className="text-sm font-bold text-white">{team.name}</span>
                         </>

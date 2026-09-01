@@ -20,7 +20,7 @@ import {
   ChevronDown,
   Loader2,
 } from "lucide-react";
-import Image from "next/image";
+import { TeamLogo } from "@/components/team-logo";
 
 type TeamRow = Database["public"]["Tables"]["teams"]["Row"];
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
@@ -217,13 +217,13 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
                       {selectedTeam ? (
                         <>
-                          <div className="relative w-7 h-7 shrink-0">
-                            <Image
-                              src={selectedTeam.logo_url}
-                              alt={selectedTeam.name}
-                              fill
-                              className="object-contain"
-                              unoptimized
+                          <div className="relative w-7 h-7 shrink-0 flex items-center justify-center">
+                            <TeamLogo
+                              logoUrl={selectedTeam.logo_url}
+                              teamName={selectedTeam.name}
+                              teamCode={selectedTeam.code}
+                              size={28}
+                              className="w-full h-full object-contain"
                             />
                           </div>
                           <span className="text-sm font-semibold text-white truncate">{selectedTeam.name}</span>
@@ -254,13 +254,13 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
                       <div className="flex items-center gap-3 truncate">
                         {selectedTeam ? (
                           <>
-                            <div className="relative w-6 h-6 shrink-0">
-                              <Image
-                                src={selectedTeam.logo_url}
-                                alt={selectedTeam.name}
-                                fill
-                                className="object-contain"
-                                unoptimized
+                            <div className="relative w-6 h-6 shrink-0 flex items-center justify-center">
+                              <TeamLogo
+                                logoUrl={selectedTeam.logo_url}
+                                teamName={selectedTeam.name}
+                                teamCode={selectedTeam.code}
+                                size={24}
+                                className="w-full h-full object-contain"
                               />
                             </div>
                             <span className="text-sm font-bold text-white truncate">{selectedTeam.name}</span>
@@ -295,9 +295,14 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
                     <div className="flex flex-col gap-1">
                       {cat.correctAnswers.map((ans, idx) => (
                         <div key={idx} className="flex items-center gap-2 text-xs font-semibold text-emerald-200">
-                          {ans.teamLogo && (
-                            <div className="relative w-4 h-4 shrink-0">
-                              <Image src={ans.teamLogo} alt="" fill className="object-contain" unoptimized />
+                          {ans.teamLogo !== undefined && (
+                            <div className="relative w-4 h-4 shrink-0 flex items-center justify-center">
+                              <TeamLogo
+                                logoUrl={ans.teamLogo}
+                                teamName={ans.teamName || "Team"}
+                                size={16}
+                                className="w-full h-full object-contain"
+                              />
                             </div>
                           )}
                           <span>{ans.teamName || ans.playerName}</span>
@@ -441,8 +446,14 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="relative w-6 h-6 shrink-0">
-                            <Image src={team.logo_url} alt={team.name} fill className="object-contain" unoptimized />
+                          <div className="relative w-6 h-6 shrink-0 flex items-center justify-center">
+                            <TeamLogo
+                              logoUrl={team.logo_url}
+                              teamName={team.name}
+                              teamCode={team.code}
+                              size={24}
+                              className="w-full h-full object-contain"
+                            />
                           </div>
                           <span className="text-sm">{team.name}</span>
                         </div>

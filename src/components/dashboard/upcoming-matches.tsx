@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { TeamLogo } from "@/components/team-logo";
 import { Star, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -102,8 +102,14 @@ export function UpcomingMatches({ matches }: UpcomingMatchesProps) {
                     <span className="text-xs sm:text-sm font-semibold text-white truncate text-right">
                       {match.homeTeam.name}
                     </span>
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#162444] border border-[#182645] flex items-center justify-center p-1 shrink-0 relative">
-                      <Image src={match.homeTeam.logoUrl} alt={match.homeTeam.code} width={32} height={32} unoptimized className="w-full h-full object-contain" />
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#162444] border border-[#182645] flex items-center justify-center p-0.5 shrink-0 relative overflow-hidden">
+                      <TeamLogo
+                        logoUrl={match.homeTeam.logoUrl}
+                        teamName={match.homeTeam.name}
+                        teamCode={match.homeTeam.code}
+                        size={32}
+                        className="w-full h-full object-contain"
+                      />
                     </div>
                   </div>
 
@@ -120,8 +126,14 @@ export function UpcomingMatches({ matches }: UpcomingMatchesProps) {
 
                   {/* Away Team */}
                   <div className="flex items-center justify-start gap-2 flex-1 min-w-0">
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#162444] border border-[#182645] flex items-center justify-center p-1 shrink-0 relative">
-                      <Image src={match.awayTeam.logoUrl} alt={match.awayTeam.code} width={32} height={32} unoptimized className="w-full h-full object-contain" />
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-[#162444] border border-[#182645] flex items-center justify-center p-0.5 shrink-0 relative overflow-hidden">
+                      <TeamLogo
+                        logoUrl={match.awayTeam.logoUrl}
+                        teamName={match.awayTeam.name}
+                        teamCode={match.awayTeam.code}
+                        size={32}
+                        className="w-full h-full object-contain"
+                      />
                     </div>
                     <span className="text-xs sm:text-sm font-semibold text-white truncate text-left">
                       {match.awayTeam.name}

@@ -74,7 +74,7 @@ import {
 } from "@/lib/players/actions";
 import { Database, MatchStage, MatchStatus } from "@/types/database.types";
 import { MatchWithTeams, SpecialCategoryWithPrediction, AnnouncementItem } from "@/types";
-import Image from "next/image";
+import { TeamLogo } from "@/components/team-logo";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type AuditLogRow = Database["public"]["Tables"]["audit_logs"]["Row"];
@@ -1170,8 +1170,14 @@ export default function AdminPage() {
                         }`}
                       >
                         <div className="flex items-center gap-2.5">
-                          <div className="relative w-5 h-5 shrink-0">
-                            <Image src={t.logo_url} alt="" fill className="object-contain" unoptimized />
+                          <div className="relative w-5 h-5 shrink-0 flex items-center justify-center">
+                            <TeamLogo
+                              logoUrl={t.logo_url}
+                              teamName={t.name}
+                              teamCode={t.code}
+                              size={20}
+                              className="w-full h-full object-contain"
+                            />
                           </div>
                           <span>{t.name}</span>
                         </div>
