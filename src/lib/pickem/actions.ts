@@ -183,6 +183,7 @@ export async function savePickemSubmissionAction(
       .upsert(
         {
           user_id: currentUser.id,
+          config_id: config.id,
           first_team_id: firstTeamId,
           top8_team_ids: top8TeamIds,
           out_team_ids: outTeamIds,

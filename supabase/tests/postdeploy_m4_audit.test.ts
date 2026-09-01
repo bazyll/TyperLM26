@@ -34,8 +34,13 @@ describe("Milestone 4 Post-Deployment Audit Verification", () => {
     });
   });
 
-  // 2. Audit Point 2: pickem_selections Granular RLS
-  describe("Audit Item: pickem_selections Granular RLS", () => {
+  // 2. Audit Point 2: pickem_selections Granular RLS & Explicit Config Relation
+  describe("Audit Item: pickem_selections Granular RLS & Explicit Config Join", () => {
+    it("adds config_id column linking pickem_submissions to pickem_config directly", () => {
+      expect(m4HardeningMigration).toContain("ALTER TABLE public.pickem_submissions");
+      expect(m4HardeningMigration).toContain("ADD COLUMN IF NOT EXISTS config_id UUID REFERENCES public.pickem_config(id)");
+    });
+
     it("drops pickem_selections_admin_all to prevent admin OR bypass of deadline secrecy", () => {
       expect(m4HardeningMigration).toContain("DROP POLICY IF EXISTS \"pickem_selections_admin_all\"");
     });
@@ -43,6 +48,10 @@ describe("Milestone 4 Post-Deployment Audit Verification", () => {
     it("requires public.is_active_user() for SELECT on pickem_selections (blocks inactive users)", () => {
       expect(m4HardeningMigration).toContain("CREATE POLICY \"pickem_selections_select_policy\"");
       expect(m4HardeningMigration).toContain("public.is_active_user()");
+    });
+
+    it("joins pickem_config explicitly via config_id instead of unrestricted CROSS JOIN", () => {
+      expect(m4HardeningMigration).toContain("JOIN public.pickem_config c ON c.id = COALESCE(s.config_id, (SELECT id FROM public.pickem_config ORDER BY created_at ASC LIMIT 1))");
     });
 
     it("restricts SELECT to own submission before deadline, and reveals all only after deadline/lock", () => {
