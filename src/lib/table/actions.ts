@@ -3,17 +3,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { calculateUCLTable, UCLStandingRow, UCLTableMode } from "@/lib/scoring/ucl-table";
 import { Database } from "@/types/database.types";
+import { LeagueCompletenessInfo } from "@/types";
 
 type TeamRow = Database["public"]["Tables"]["teams"]["Row"];
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
-
-export interface LeagueCompletenessInfo {
-  totalTeams: number;
-  totalScheduledMatches: number;
-  finishedMatchesCount: number;
-  isComplete: boolean;
-  teamsWith8MatchesCount: number;
-}
 
 /**
  * Fetches dynamic UEFA Champions League 36-team table generated from completed matches.

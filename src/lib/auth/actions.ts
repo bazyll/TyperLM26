@@ -287,7 +287,7 @@ export async function changePasswordAction(newPassword: string): Promise<ActionR
 }
 
 /**
- * Server Action: Update Avatar URL with old file cleanup
+ * Server Action: Update Avatar URL with safe old file cleanup
  */
 export async function updateAvatarUrlAction(newAvatarUrl: string): Promise<ActionResult> {
   const currentUser = await getCurrentUserProfile();
@@ -305,12 +305,18 @@ export async function updateAvatarUrlAction(newAvatarUrl: string): Promise<Actio
 
     if (error) throw error;
 
-    // 2. Cleanup: delete previous avatar file from storage if present
+    // 2. Cleanup: delete previous avatar file from storage if different
     if (oldAvatarUrl && oldAvatarUrl !== newAvatarUrl) {
       try {
-        const urlParts = oldAvatarUrl.split("/avatars/");
-        if (urlParts.length > 1) {
-          const oldFilePath = decodeURIComponent(urlParts[1]);
+        const extractPath = (url: string): string | null => {
+          const match = url.match(/\/avatars\/([^?#]+)/);
+          return match && match[1] ? decodeURIComponent(match[1]) : null;
+        };
+
+        const oldFilePath = extractPath(oldAvatarUrl);
+        const newFilePath = extractPath(newAvatarUrl);
+
+        if (oldFilePath && newFilePath && oldFilePath !== newFilePath) {
           await adminSupabase.storage.from("avatars").remove([oldFilePath]);
         }
       } catch (cleanupErr) {
@@ -320,6 +326,10 @@ export async function updateAvatarUrlAction(newAvatarUrl: string): Promise<Actio
 
     revalidatePath("/konto");
     revalidatePath(`/profil/${currentUser.username}`);
+    revalidatePath("/");
+    revalidatePath("/ranking");
+    revalidatePath("/mecze");
+    revalidatePath("/ogloszenia");
     return { success: true };
   } catch (err) {
     console.error("Error updating avatar:", err);

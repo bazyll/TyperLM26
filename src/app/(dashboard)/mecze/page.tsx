@@ -31,7 +31,7 @@ export default function MatchesPage() {
   const [matches, setMatches] = useState<MatchWithTeams[]>([]);
   const [loading, setLoading] = useState(true);
   // Default tab is "upcoming" (Najbliższe) as requested
-  const [activeTab, setActiveTab] = useState<"upcoming" | "finished" | "live" | "all">("upcoming");
+  const [activeTab, setActiveTab] = useState<"upcoming" | "finished" | "all">("upcoming");
   const [currentPage, setCurrentPage] = useState(1);
 
   const [predictionInputs, setPredictionInputs] = useState<Record<string, { home: number; away: number }>>({});
@@ -69,27 +69,25 @@ export default function MatchesPage() {
     loadMatches();
   }, []);
 
-  const handleTabChange = (tab: "upcoming" | "finished" | "live" | "all") => {
+  const handleTabChange = (tab: "upcoming" | "finished" | "all") => {
     setActiveTab(tab);
-    setCurrentPage(1); // Reset page to 1 on tab change
+    setCurrentPage(1);
   };
 
   const handleScoreChange = (matchId: string, team: "home" | "away", delta: number) => {
     const current = predictionInputs[matchId] || { home: 0, away: 0 };
     const nextVal = Math.max(0, Math.min(99, current[team] + delta));
-    setPredictionInputs({
-      ...predictionInputs,
+    setPredictionInputs((prev) => ({
+      ...prev,
       [matchId]: {
-        ...current,
+        ...(prev[matchId] || { home: 0, away: 0 }),
         [team]: nextVal,
       },
-    });
+    }));
   };
 
   const handleSavePrediction = (matchId: string) => {
-    const input = predictionInputs[matchId];
-    if (!input) return;
-
+    const input = predictionInputs[matchId] || { home: 0, away: 0 };
     setSaveStatus((prev) => ({ ...prev, [matchId]: { type: "success", message: "Zapisywanie..." } }));
 
     startTransition(async () => {
@@ -123,10 +121,17 @@ export default function MatchesPage() {
   // Filter and Sort based on selected tab rules
   const filteredMatches = useMemo(() => {
     if (activeTab === "upcoming") {
-      // Future scheduled matches open for prediction, closest kickoff first
-      return matches
+      // 1. LIVE matches first at the very top
+      const liveMatches = matches
+        .filter((m) => m.status === "live")
+        .sort((a, b) => new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime());
+
+      // 2. Upcoming scheduled matches open for prediction, closest kickoff first
+      const upcomingMatches = matches
         .filter((m) => m.status === "scheduled" && new Date(m.kickoffAt).getTime() > now && !m.isBettingLocked)
         .sort((a, b) => new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime());
+
+      return [...liveMatches, ...upcomingMatches];
     }
 
     if (activeTab === "finished") {
@@ -134,13 +139,6 @@ export default function MatchesPage() {
       return matches
         .filter((m) => m.status === "finished")
         .sort((a, b) => new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime());
-    }
-
-    if (activeTab === "live") {
-      // Live matches, sorted by kickoff
-      return matches
-        .filter((m) => m.status === "live")
-        .sort((a, b) => new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime());
     }
 
     // All matches sorted with priority to closest to now
@@ -187,7 +185,7 @@ export default function MatchesPage() {
           </h1>
         </div>
 
-        {/* Filter Tabs in requested exact order: Najbliższe, Zakończone, Live, Wszystkie */}
+        {/* Filter Tabs in requested exact order: Najbliższe, Zakończone, Wszystkie */}
         <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 no-scrollbar">
           <Button
             size="sm"
@@ -195,7 +193,8 @@ export default function MatchesPage() {
             onClick={() => handleTabChange("upcoming")}
             className="text-xs font-semibold shrink-0"
           >
-            Najbliższe
+            {liveMatchesCount > 0 && <span className="w-2 h-2 rounded-full bg-red-500 animate-ping mr-1.5" />}
+            Najbliższe {liveMatchesCount > 0 && `(LIVE: ${liveMatchesCount})`}
           </Button>
 
           <Button
@@ -205,18 +204,6 @@ export default function MatchesPage() {
             className="text-xs font-semibold shrink-0"
           >
             Zakończone
-          </Button>
-
-          <Button
-            size="sm"
-            variant={activeTab === "live" ? "default" : "outline"}
-            onClick={() => handleTabChange("live")}
-            className={`text-xs font-semibold shrink-0 ${
-              liveMatchesCount > 0 ? "border-red-500/50 text-red-400 font-bold" : ""
-            }`}
-          >
-            {liveMatchesCount > 0 && <span className="w-2 h-2 rounded-full bg-red-500 animate-ping mr-1" />}
-            Live ({liveMatchesCount})
           </Button>
 
           <Button

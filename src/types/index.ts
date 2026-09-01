@@ -13,6 +13,14 @@ export interface UserProfile {
   announcementsLastSeenAt?: string | null;
 }
 
+export interface LeagueCompletenessInfo {
+  totalTeams: number;
+  totalScheduledMatches: number;
+  finishedMatchesCount: number;
+  isComplete: boolean;
+  teamsWith8MatchesCount: number;
+}
+
 export interface MatchWithTeams {
   id: string;
   matchday: number | null;

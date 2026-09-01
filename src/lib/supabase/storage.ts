@@ -45,12 +45,19 @@ export async function uploadAvatar(userId: string, file: File): Promise<AvatarUp
       return { success: false, error: "Błąd podczas przesyłania zdjęcia do pamięci." };
     }
 
-    // Get URL
-    const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
+    // Generate signed URL for private bucket (valid for 1 year = 31536000 seconds)
+    const { data: signData, error: signError } = await supabase.storage
+      .from("avatars")
+      .createSignedUrl(filePath, 31536000);
+
+    if (signError || !signData?.signedUrl) {
+      console.error("Storage signed URL error:", signError);
+      return { success: false, error: "Błąd podczas generowania bezpiecznego adresu zdjęcia." };
+    }
 
     return {
       success: true,
-      avatarUrl: data.publicUrl,
+      avatarUrl: signData.signedUrl,
     };
   } catch (err) {
     console.error("Unexpected upload error:", err);

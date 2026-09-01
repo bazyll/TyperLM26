@@ -8,6 +8,7 @@ import { getCurrentUserProfile } from "@/lib/auth/actions";
 import { getUserStatsAction, getLeaderboardAction } from "@/lib/matches/actions";
 import { Database } from "@/types/database.types";
 import { TeamLogo } from "@/components/team-logo";
+import { ProfilePredictionsHistory, ProfilePredictionItem } from "@/components/profile/profile-predictions-history";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type PredictionRow = Database["public"]["Tables"]["predictions"]["Row"];
@@ -289,79 +290,41 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       <Card className="rounded-3xl border-slate-800 bg-slate-900 p-6 shadow-xl">
         <h2 className="text-lg font-bold text-white mb-4">Historia typów meczowych</h2>
 
-        {!rawMatchesPreds || rawMatchesPreds.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-500 rounded-2xl bg-slate-950 border border-slate-800">
-            Użytkownik nie obstawił jeszcze żadnego spotkania.
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {(rawMatchesPreds as unknown as Array<PredictionRow & {
-              match: MatchRow & {
-                home_team: TeamRow;
-                away_team: TeamRow;
-              };
-            }>).map((pred) => {
-              const match = pred.match;
-              if (!match) return null;
+        {(() => {
+          const formattedPreds: ProfilePredictionItem[] = (
+            (rawMatchesPreds as unknown as Array<
+              PredictionRow & {
+                match: MatchRow & {
+                  home_team: TeamRow;
+                  away_team: TeamRow;
+                };
+              }
+            >) || []
+          )
+            .filter((p) => p.match)
+            .map((p) => ({
+              id: p.id,
+              homeScore: p.home_score,
+              awayScore: p.away_score,
+              pointsAwarded: p.points_awarded,
+              match: {
+                id: p.match.id,
+                stage: p.match.stage,
+                matchday: p.match.matchday,
+                kickoffAt: p.match.kickoff_at,
+                status: p.match.status,
+                isBettingLocked: p.match.is_betting_locked,
+                homeScore: p.match.home_score,
+                awayScore: p.match.away_score,
+                homeTeamName: p.match.home_team?.name || "Gospodarze",
+                homeTeamShort: p.match.home_team?.short_name || "GOS",
+                awayTeamName: p.match.away_team?.name || "Goście",
+                awayTeamShort: p.match.away_team?.short_name || "GOS",
+              },
+            }));
 
-              const isKickoffPassed = new Date(match.kickoff_at).getTime() <= Date.now() || match.is_betting_locked;
-              const canViewScore = isOwner || isKickoffPassed;
-
-              return (
-                <div
-                  key={pred.id}
-                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-950 border border-slate-800"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-white">
-                      {match.home_team?.short_name} vs {match.away_team?.short_name}
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      {match.matchday ? `Kolejka ${match.matchday}` : match.stage}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
-                    {canViewScore ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-slate-400">Typ:</span>
-                        <span className="text-sm font-mono font-extrabold text-white">
-                          {pred.home_score}:{pred.away_score}
-                        </span>
-                        {match.home_score !== null && match.away_score !== null && (
-                          <span className="text-xs text-slate-500 font-mono">
-                            (Wynik: {match.home_score}:{match.away_score})
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                        <Lock className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Typ ukryty do rozpoczęcia meczu</span>
-                      </div>
-                    )}
-
-                    {match.status === "finished" && pred.points_awarded !== null && (
-                      <Badge
-                        className={`text-xs font-bold ${
-                          pred.points_awarded === 3
-                            ? "bg-emerald-950 border-emerald-500 text-emerald-300"
-                            : pred.points_awarded === 2
-                            ? "bg-blue-950 border-blue-500 text-blue-300"
-                            : pred.points_awarded === 1
-                            ? "bg-indigo-950 border-indigo-500 text-indigo-300"
-                            : "bg-slate-900 border-slate-700 text-slate-400"
-                        }`}
-                      >
-                        +{pred.points_awarded} pkt
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+          return <ProfilePredictionsHistory predictions={formattedPreds} isOwner={isOwner} />;
+        })()}
       </Card>
     </div>
   );

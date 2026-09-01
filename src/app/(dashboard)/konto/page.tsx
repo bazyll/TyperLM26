@@ -16,6 +16,7 @@ import {
 import { getUserStatsAction, getLeaderboardAction, getMatchesWithPredictionsAction } from "@/lib/matches/actions";
 import { uploadAvatar } from "@/lib/supabase/storage";
 import { UserProfile, UserMatchStats, MatchWithTeams } from "@/types";
+import { ProfilePredictionsHistory } from "@/components/profile/profile-predictions-history";
 
 export default function AccountPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -252,64 +253,32 @@ export default function AccountPage() {
           <Card className="rounded-3xl border-[#182645] bg-[#0c1527] p-6 shadow-xl">
             <h2 className="text-lg font-bold text-white mb-4">Twoje obstawione mecze</h2>
 
-            {userMatches.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500 rounded-2xl bg-[#101d36]/40 border border-[#182645]">
-                Nie obstawiłeś jeszcze żadnych meczów. Przejdź do zakładki <a href="/mecze" className="text-blue-400 underline font-semibold">Mecze</a>, aby wytypować wyniki!
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {userMatches.map((match) => {
-                  const pred = match.userPrediction!;
-                  return (
-                    <div
-                      key={match.id}
-                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-[#101d36] border border-[#182645]"
-                    >
-                      {/* Teams */}
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-bold text-white">
-                          {match.homeTeam.shortName} vs {match.awayTeam.shortName}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          {match.matchday ? `Kolejka ${match.matchday}` : match.stage}
-                        </span>
-                      </div>
+            {(() => {
+              const formattedPreds = userMatches
+                .filter((m) => m.userPrediction)
+                .map((m) => ({
+                  id: m.id,
+                  homeScore: m.userPrediction!.homeScore,
+                  awayScore: m.userPrediction!.awayScore,
+                  pointsAwarded: m.userPrediction!.pointsAwarded ?? null,
+                  match: {
+                    id: m.id,
+                    stage: m.stage,
+                    matchday: m.matchday,
+                    kickoffAt: m.kickoffAt,
+                    status: m.status,
+                    isBettingLocked: m.isBettingLocked,
+                    homeScore: m.homeScore,
+                    awayScore: m.awayScore,
+                    homeTeamName: m.homeTeam.name,
+                    homeTeamShort: m.homeTeam.shortName,
+                    awayTeamName: m.awayTeam.name,
+                    awayTeamShort: m.awayTeam.shortName,
+                  },
+                }));
 
-                      {/* Prediction & Score */}
-                      <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-400">Twój typ:</span>
-                          <span className="text-sm font-mono font-extrabold text-white">
-                            {pred.homeScore}:{pred.awayScore}
-                          </span>
-                          {match.homeScore !== null && match.awayScore !== null && (
-                            <span className="text-xs text-slate-500 font-mono">
-                              (Wynik: {match.homeScore}:{match.awayScore})
-                            </span>
-                          )}
-                        </div>
-
-                        {match.status === "finished" && pred.pointsAwarded !== null && (
-                          <Badge
-                            className={`text-xs font-bold ${
-                              pred.pointsAwarded === 3
-                                ? "bg-emerald-950 border-emerald-500 text-emerald-300"
-                                : pred.pointsAwarded === 2
-                                ? "bg-blue-950 border-blue-500 text-blue-300"
-                                : pred.pointsAwarded === 1
-                                ? "bg-indigo-950 border-indigo-500 text-indigo-300"
-                                : "bg-slate-900 border-slate-700 text-slate-400"
-                            }`}
-                          >
-                            +{pred.pointsAwarded} pkt
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+              return <ProfilePredictionsHistory predictions={formattedPreds} isOwner={true} />;
+            })()}
           </Card>
         </div>
       ) : (
