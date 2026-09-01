@@ -4,13 +4,17 @@ import { Database } from "@/types/database.types";
 
 /**
  * Creates a Supabase client for use in Server Components, Server Actions, and Route Handlers.
+ * Supports modern NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (sb_publishable_...) with fallback to NEXT_PUBLIC_SUPABASE_ANON_KEY.
  */
 export async function createClient() {
   const cookieStore = await cookies();
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder.supabase.co";
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
+  const supabaseKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    "placeholder-anon-key";
 
-  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+  return createServerClient<Database>(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
         return cookieStore.getAll();

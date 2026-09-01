@@ -7,14 +7,15 @@ config({ path: ".env" });
 
 async function bootstrapAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // Support modern SUPABASE_SECRET_KEY with fallback to SUPABASE_SERVICE_ROLE_KEY
+  const secretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-  if (!supabaseUrl || !serviceRoleKey) {
-    console.error("BŁĄD: Brak zmiennych środowiskowych NEXT_PUBLIC_SUPABASE_URL lub SUPABASE_SERVICE_ROLE_KEY.");
+  if (!supabaseUrl || !secretKey) {
+    console.error("BŁĄD: Brak zmiennych środowiskowych NEXT_PUBLIC_SUPABASE_URL oraz SUPABASE_SECRET_KEY (lub SUPABASE_SERVICE_ROLE_KEY).");
     process.exit(1);
   }
 
-  const adminClient = createClient<Database>(supabaseUrl, serviceRoleKey, {
+  const adminClient = createClient<Database>(supabaseUrl, secretKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
