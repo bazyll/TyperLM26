@@ -1,20 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { Database } from "@/types/database.types";
-
-type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+import { createAdminClient } from "@/lib/supabase/admin";
+import { getLeaderboardAction } from "@/lib/matches/actions";
+import { generateRankingCsv, generateRankingTxt, RankingExportRow } from "@/lib/export/utils";
 
 /**
- * Route Handler: GET /api/export/ranking
+ * Route Handler: GET /api/export/ranking?format=txt|csv
  *
- * Generates an in-memory ranking snapshot (.txt file) and streams it directly to the browser.
- * Fully compatible with Vercel Serverless Functions — zero disk writes.
+ * Admin export for rankings in .txt or .csv format.
+ * Purely in-memory, streaming response — zero disk writes on serverless.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
 
-    // Verify session
+    // 1. Verify user session and admin role
     const {
       data: { user },
       error: userError,
@@ -24,42 +24,79 @@ export async function GET() {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    const { data: rawProfile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    const profile = rawProfile as unknown as { id: string; role: string; is_active: boolean } | null;
+
+    if (!profile || !profile.is_active || profile.role !== "admin") {
+      return new NextResponse("Forbidden: Tylko administrator może pobrać export rankingu.", { status: 403 });
+    }
+
+    const format = request.nextUrl.searchParams.get("format") === "csv" ? "csv" : "txt";
     const now = new Date();
     const dateFormatted = now.toLocaleString("pl-PL", { timeZone: "UTC" });
     const filenameDate = now.toISOString().replace(/[:.]/g, "-").slice(0, 16);
 
-    // Fetch latest profiles and points (demo/production logic)
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username, first_name, last_name, role")
-      .order("created_at", { ascending: true });
+    // 2. Fetch fresh leaderboard from database
+    const leaderboard = await getLeaderboardAction();
 
-    const profiles = data as Pick<ProfileRow, "id" | "username" | "first_name" | "last_name" | "role">[] | null;
+    const exportRows: RankingExportRow[] = leaderboard.map((e) => ({
+      position: e.rank,
+      username: e.username,
+      firstName: e.firstName,
+      lastName: e.lastName,
+      matchPoints: e.matchPoints,
+      specialPoints: e.specialPoints,
+      pickemPoints: e.pickemPoints,
+      totalPoints: e.totalPoints,
+      generatedAt: now.toISOString(),
+    }));
 
-    let fileContent = `TyperLM26\nSnapshot rankingu\n\nData wygenerowania:\n${dateFormatted} UTC\n\n`;
+    const adminSupabase = createAdminClient();
 
-    if (profiles && profiles.length > 0) {
-      profiles.forEach((p, idx) => {
-        fileContent += `${idx + 1}. ${p.first_name} ${p.last_name} (@${p.username}) — 0 pkt\n`;
+    if (format === "csv") {
+      const csvContent = generateRankingCsv(exportRows);
+
+      await adminSupabase.from("audit_logs").insert({
+        actor_id: user.id,
+        action: "RANKING_CSV_EXPORTED",
+        target_type: "ranking_export",
+        details: { totalRows: exportRows.length },
+      });
+
+      return new NextResponse(csvContent, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="TyperLM26-ranking-${filenameDate}.csv"`,
+          "Cache-Control": "no-store, max-age=0",
+        },
       });
     } else {
-      fileContent += `1. Bartosz Kowalski (@bartosz) — 1 250 pkt\n`;
-      fileContent += `2. Michał Nowak (@michal) — 1 120 pkt\n`;
-      fileContent += `3. Kamil Wiśniewski (@kamil) — 980 pkt\n`;
-      fileContent += `4. Dominik Wójcik (@dominik) — 870 pkt\n`;
-      fileContent += `5. Paweł Kamiński (@pawel) — 760 pkt\n`;
-    }
+      const txtContent = generateRankingTxt(exportRows, `${dateFormatted} UTC`);
 
-    return new NextResponse(fileContent, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Content-Disposition": `attachment; filename="TyperLM26-ranking-${filenameDate}.txt"`,
-        "Cache-Control": "no-store, max-age=0",
-      },
-    });
+      await adminSupabase.from("audit_logs").insert({
+        actor_id: user.id,
+        action: "RANKING_TXT_EXPORTED",
+        target_type: "ranking_export",
+        details: { totalRows: exportRows.length },
+      });
+
+      return new NextResponse(txtContent, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Content-Disposition": `attachment; filename="TyperLM26-ranking-${filenameDate}.txt"`,
+          "Cache-Control": "no-store, max-age=0",
+        },
+      });
+    }
   } catch (err) {
-    console.error("Export error:", err);
+    console.error("Ranking export error:", err);
     return new NextResponse("Internal Server Error", { status: 500 });
   }
 }

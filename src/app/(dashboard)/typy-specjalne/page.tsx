@@ -1,7 +1,26 @@
-import { SpecialPredictionsPreview } from "@/components/dashboard/special-predictions-preview";
+import { getSpecialCategoriesWithPredictionsAction } from "@/lib/specials/actions";
+import { createClient } from "@/lib/supabase/server";
+import { SpecialPredictionsClient } from "@/components/specials/special-predictions-client";
 import { Star, ShieldAlert } from "lucide-react";
+import { Database } from "@/types/database.types";
 
-export default function SpecialPredictionsPage() {
+type TeamRow = Database["public"]["Tables"]["teams"]["Row"];
+type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
+
+export const dynamic = "force-dynamic";
+
+export default async function SpecialPredictionsPage() {
+  const supabase = await createClient();
+
+  const [categories, { data: rawTeams }, { data: rawPlayers }] = await Promise.all([
+    getSpecialCategoriesWithPredictionsAction(),
+    supabase.from("teams").select("*").order("name", { ascending: true }),
+    supabase.from("players").select("*").eq("is_active", true).order("name", { ascending: true }),
+  ]);
+
+  const teams = (rawTeams || []) as unknown as TeamRow[];
+  const players = (rawPlayers || []) as unknown as PlayerRow[];
+
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
       <div>
@@ -13,18 +32,22 @@ export default function SpecialPredictionsPage() {
           Typy Specjalne
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Wskaż triumfatorów, króla strzelców i statystyki sezonu. Typy zostaną zablokowane po upływie deadline&apos;u.
+          Wskaż triumfatorów, króla strzelców i statystyki sezonu. Do momentu upływu deadline&apos;u Twoje typy są ukryte dla rywali.
         </p>
       </div>
 
       <div className="flex items-center gap-3 p-4 rounded-2xl bg-blue-950/40 border border-blue-500/20 text-xs text-blue-300">
         <ShieldAlert className="w-5 h-5 text-blue-400 shrink-0" />
         <span>
-          Deadline dla wszystkich typów specjalnych: <strong>15.09.2026, 18:45 UTC</strong>. Do tego momentu Twoje typy są widoczne tylko dla Ciebie.
+          Maksymalnie do zdobycia w Typach Specjalnych: <strong>120 pkt</strong> (6 kategorii po 20 pkt). Po upływie deadline&apos;u typy zostaną zablokowane i odsłonięte dla wszystkich graczy.
         </span>
       </div>
 
-      <SpecialPredictionsPreview />
+      <SpecialPredictionsClient
+        initialCategories={categories}
+        teams={teams}
+        players={players}
+      />
     </div>
   );
 }

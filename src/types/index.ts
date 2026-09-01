@@ -86,3 +86,101 @@ export interface UserMatchStats {
   averagePointsPerMatch: number;
   accuracyRate: number; // (exact + diff + outcome) / predictedMatchesCount * 100
 }
+
+export interface SpecialCategoryWithPrediction {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  targetType: "team" | "player";
+  pointsValue: number;
+  deadlineAt: string;
+  status: "open" | "locked" | "settled";
+  isLocked: boolean;
+  correctAnswers?: Array<{
+    teamId?: string | null;
+    teamName?: string | null;
+    teamLogo?: string | null;
+    playerId?: string | null;
+    playerName?: string | null;
+  }>;
+  userPrediction?: {
+    id?: string;
+    selectedTeamId?: string | null;
+    selectedTeamName?: string | null;
+    selectedTeamLogo?: string | null;
+    selectedPlayerId?: string | null;
+    selectedPlayerName?: string | null;
+    pointsAwarded?: number | null;
+  };
+  allPredictions?: Array<{
+    userId: string;
+    username: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl: string | null;
+    selectedTeamId?: string | null;
+    selectedTeamName?: string | null;
+    selectedPlayerId?: string | null;
+    selectedPlayerName?: string | null;
+    pointsAwarded?: number | null;
+  }>;
+}
+
+export interface PickemSelectionItem {
+  teamId: string;
+  teamName: string;
+  teamCode: string;
+  teamLogoUrl: string;
+  category: "first" | "top8" | "out" | "middle";
+  finalRank?: number;
+  pointsAwarded?: number;
+  isHit?: boolean;
+}
+
+export interface PickemSubmissionWithDetails {
+  id?: string;
+  userId?: string;
+  pointsAwarded?: number | null;
+  firstTeamId?: string;
+  top8TeamIds?: string[];
+  outTeamIds?: string[];
+  selections: PickemSelectionItem[];
+  allSubmissions?: Array<{
+    userId: string;
+    username: string;
+    firstName: string;
+    lastName: string;
+    avatarUrl: string | null;
+    pointsAwarded?: number | null;
+    firstTeamId?: string;
+    top8TeamIds?: string[];
+    outTeamIds?: string[];
+  }>;
+}
+
+export interface AnnouncementItem {
+  id: string;
+  authorId: string | null;
+  authorName: string;
+  authorAvatarUrl: string | null;
+  title: string;
+  content: string;
+  isPinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+  commentsCount: number;
+  comments?: AnnouncementCommentItem[];
+}
+
+export interface AnnouncementCommentItem {
+  id: string;
+  announcementId: string;
+  userId: string | null;
+  userName: string;
+  userAvatarUrl: string | null;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  isOwner?: boolean;
+}

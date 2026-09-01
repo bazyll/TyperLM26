@@ -1,17 +1,24 @@
 import { notFound } from "next/navigation";
-import { Trophy, Flame, Lock, Shield, Calendar, Clock, CheckCircle2 } from "lucide-react";
+import { Trophy, Star, Lock, Shield, CheckCircle2, XCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentUserProfile } from "@/lib/auth/actions";
 import { getUserStatsAction, getLeaderboardAction } from "@/lib/matches/actions";
 import { Database } from "@/types/database.types";
+import Image from "next/image";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type PredictionRow = Database["public"]["Tables"]["predictions"]["Row"];
 type MatchRow = Database["public"]["Tables"]["matches"]["Row"];
 type TeamRow = Database["public"]["Tables"]["teams"]["Row"];
+type SpecialCategoryRow = Database["public"]["Tables"]["special_prediction_categories"]["Row"];
+type SpecialPredictionRow = Database["public"]["Tables"]["special_predictions"]["Row"];
+type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
+type PickemConfigRow = Database["public"]["Tables"]["pickem_config"]["Row"];
+type PickemSubmissionRow = Database["public"]["Tables"]["pickem_submissions"]["Row"];
+type PickemSelectionRow = Database["public"]["Tables"]["pickem_selections"]["Row"];
 
 interface ProfilePageProps {
   params: Promise<{
@@ -38,33 +45,55 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     notFound();
   }
 
-  const [stats, leaderboard] = await Promise.all([
-    getUserStatsAction(profile.id),
-    getLeaderboardAction(),
-  ]);
-
-  const userRank = leaderboard.find((e) => e.userId === profile.id)?.rank;
   const isOwner = currentUser?.id === profile.id;
 
-  // Fetch match predictions for this user
-  const { data: userPredictions } = await supabase
-    .from("predictions")
-    .select(`
-      *,
-      match:matches(
+  const [stats, leaderboard, { data: rawMatchesPreds }, { data: rawSpecialCats }, { data: rawSpecialPreds }, { data: rawTeams }, { data: rawPlayers }, { data: rawPickemCfg }, { data: rawPickemSub }, { data: rawPickemSels }] = await Promise.all([
+    getUserStatsAction(profile.id),
+    getLeaderboardAction(),
+    supabase
+      .from("predictions")
+      .select(`
         *,
-        home_team:teams!matches_home_team_id_fkey(*),
-        away_team:teams!matches_away_team_id_fkey(*)
-      )
-    `)
-    .eq("user_id", profile.id);
+        match:matches(
+          *,
+          home_team:teams!matches_home_team_id_fkey(*),
+          away_team:teams!matches_away_team_id_fkey(*)
+        )
+      `)
+      .eq("user_id", profile.id),
+    supabase.from("special_prediction_categories").select("*").order("created_at", { ascending: true }),
+    supabase.from("special_predictions").select("*").eq("user_id", profile.id),
+    supabase.from("teams").select("*"),
+    supabase.from("players").select("*"),
+    supabase.from("pickem_config").select("*").maybeSingle(),
+    supabase.from("pickem_submissions").select("*").eq("user_id", profile.id).maybeSingle(),
+    supabase.from("pickem_selections").select("*"),
+  ]);
+
+  const userEntry = leaderboard.find((e) => e.userId === profile.id);
+  const userRank = userEntry?.rank;
+
+  const teamsMap = new Map<string, TeamRow>();
+  (rawTeams as unknown as TeamRow[] || []).forEach((t) => teamsMap.set(t.id, t));
+
+  const playersMap = new Map<string, PlayerRow>();
+  (rawPlayers as unknown as PlayerRow[] || []).forEach((p) => playersMap.set(p.id, p));
+
+  const specialCategories = (rawSpecialCats || []) as unknown as SpecialCategoryRow[];
+  const specialPredictions = (rawSpecialPreds || []) as unknown as SpecialPredictionRow[];
+  const pickemConfig = rawPickemCfg as unknown as PickemConfigRow | null;
+  const pickemSub = rawPickemSub as unknown as PickemSubmissionRow | null;
+  const pickemSels = (rawPickemSels || []) as unknown as PickemSelectionRow[];
+
+  const isPickemLocked = Boolean(pickemConfig && (new Date(pickemConfig.deadline_at).getTime() <= Date.now() || pickemConfig.is_locked));
+  const canViewPickem = isOwner || isPickemLocked;
 
   const initials = `${profile.first_name[0] || "U"}${profile.last_name[0] || ""}`;
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
       {/* Profile Header Card */}
-      <Card className="rounded-3xl border-[#182645] bg-[#0c1527] p-6 sm:p-8 shadow-2xl relative overflow-hidden">
+      <Card className="rounded-3xl border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-2xl relative overflow-hidden">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
           <Avatar className="w-24 h-24 sm:w-28 sm:h-28 border-2 border-blue-500/40 shadow-xl">
             {profile.avatar_url && <AvatarImage src={profile.avatar_url} alt={profile.first_name} />}
@@ -79,7 +108,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                 {profile.first_name} {profile.last_name}
               </h1>
               {profile.role === "admin" && (
-                <Badge variant="default" className="gap-1">
+                <Badge variant="default" className="gap-1 bg-blue-600/30 text-blue-300 border-blue-500/40">
                   <Shield className="w-3 h-3 text-blue-400" />
                   Admin
                 </Badge>
@@ -90,60 +119,168 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             </div>
             <span className="text-sm text-slate-400 font-medium">@{profile.username}</span>
 
-            {/* Quick Metrics */}
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 mt-3">
-              <div className="px-4 py-2 rounded-xl bg-[#162444]/60 border border-[#182645] text-center">
-                <span className="text-[11px] text-slate-400">Miejsce</span>
-                <div className="text-lg font-extrabold text-white">{userRank ? `#${userRank}` : "-"}</div>
+            {/* Total Points & Breakdown Metrics */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-3 w-full sm:w-auto">
+              <div className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Miejsce</span>
+                <div className="text-base sm:text-lg font-extrabold text-white">{userRank ? `#${userRank}` : "-"}</div>
               </div>
-              <div className="px-4 py-2 rounded-xl bg-[#162444]/60 border border-[#182645] text-center">
-                <span className="text-[11px] text-slate-400">Punkty</span>
-                <div className="text-lg font-extrabold text-blue-400">{stats.totalPoints} pkt</div>
+              <div className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Mecze</span>
+                <div className="text-base sm:text-lg font-extrabold text-blue-400">{userEntry?.matchPoints || 0} pkt</div>
               </div>
-              <div className="px-4 py-2 rounded-xl bg-[#162444]/60 border border-[#182645] text-center">
-                <span className="text-[11px] text-slate-400">Skuteczność</span>
-                <div className="text-lg font-extrabold text-emerald-400">{stats.accuracyRate}%</div>
+              <div className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Specjalne</span>
+                <div className="text-base sm:text-lg font-extrabold text-purple-400">{userEntry?.specialPoints || 0} pkt</div>
               </div>
-              <div className="px-4 py-2 rounded-xl bg-[#162444]/60 border border-[#182645] text-center">
-                <span className="text-[11px] text-slate-400">Śr. pkt/mecz</span>
-                <div className="text-lg font-extrabold text-amber-400">{stats.averagePointsPerMatch}</div>
+              <div className="px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                <span className="text-[10px] text-slate-400 uppercase font-bold">Pick&apos;em</span>
+                <div className="text-base sm:text-lg font-extrabold text-amber-400">{userEntry?.pickemPoints || 0} pkt</div>
+              </div>
+              <div className="px-3.5 py-2 rounded-xl bg-blue-950/40 border border-blue-500/40 text-center col-span-2 sm:col-span-1">
+                <span className="text-[10px] text-blue-300 uppercase font-bold">RAZEM</span>
+                <div className="text-base sm:text-lg font-extrabold text-white">{userEntry?.totalPoints || 0} pkt</div>
               </div>
             </div>
           </div>
         </div>
       </Card>
 
-      {/* Detailed Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <Card className="rounded-2xl border-[#182645] bg-[#0c1527] p-4 text-center">
-          <span className="text-xs text-slate-400">Dokładne (3 pkt)</span>
-          <div className="text-xl font-extrabold text-emerald-400 mt-1">{stats.exactScoresCount}</div>
-        </Card>
-        <Card className="rounded-2xl border-[#182645] bg-[#0c1527] p-4 text-center">
-          <span className="text-xs text-slate-400">Różnica bramek / remis (2 pkt)</span>
-          <div className="text-xl font-extrabold text-blue-400 mt-1">{stats.diffScoresCount}</div>
-        </Card>
-        <Card className="rounded-2xl border-[#182645] bg-[#0c1527] p-4 text-center">
-          <span className="text-xs text-slate-400">Rezultat (1 pkt)</span>
-          <div className="text-xl font-extrabold text-indigo-400 mt-1">{stats.outcomeScoresCount}</div>
-        </Card>
-        <Card className="rounded-2xl border-[#182645] bg-[#0c1527] p-4 text-center">
-          <span className="text-xs text-slate-400">Nietrafione (0 pkt)</span>
-          <div className="text-xl font-extrabold text-slate-400 mt-1">{stats.incorrectScoresCount}</div>
-        </Card>
-      </div>
+      {/* Special Predictions Profile Section */}
+      <Card className="rounded-3xl border-slate-800 bg-slate-900 p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Star className="w-5 h-5 text-purple-400" />
+            <h2 className="text-lg font-bold text-white">Typy Specjalne</h2>
+          </div>
+        </div>
 
-      {/* Predictions History */}
-      <Card className="rounded-3xl border-[#182645] bg-[#0c1527] p-6 shadow-xl">
-        <h2 className="text-lg font-bold text-white mb-4">Historia typów</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {specialCategories.map((cat) => {
+            const isCatLocked = new Date(cat.deadline_at).getTime() <= Date.now() || cat.is_locked;
+            const canViewCat = isOwner || isCatLocked;
+            const pred = specialPredictions.find((p) => p.category_id === cat.id);
 
-        {!userPredictions || userPredictions.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-500 rounded-2xl bg-[#101d36]/40 border border-[#182645]">
+            const team = pred?.selected_team_id ? teamsMap.get(pred.selected_team_id) : undefined;
+            const player = pred?.selected_player_id ? playersMap.get(pred.selected_player_id) : undefined;
+
+            return (
+              <div key={cat.id} className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800 flex flex-col justify-between gap-2">
+                <div>
+                  <span className="text-[11px] font-bold text-slate-400 block">{cat.title}</span>
+                  {canViewCat ? (
+                    <div className="mt-1 flex items-center gap-2">
+                      {team ? (
+                        <>
+                          <div className="relative w-5 h-5 shrink-0">
+                            <Image src={team.logo_url} alt="" fill className="object-contain" unoptimized />
+                          </div>
+                          <span className="text-sm font-bold text-white">{team.name}</span>
+                        </>
+                      ) : player ? (
+                        <span className="text-sm font-bold text-white">{player.name}</span>
+                      ) : (
+                        <span className="text-xs text-slate-500 italic">Brak typu</span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
+                      <Lock className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Ukryty do deadline&apos;u</span>
+                    </div>
+                  )}
+                </div>
+
+                {cat.status === "settled" && pred && pred.points_awarded !== null && (
+                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-end">
+                    <span className={`text-xs font-bold ${pred.points_awarded > 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {pred.points_awarded > 0 ? `✅ +${pred.points_awarded} pkt` : `❌ 0 pkt`}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+
+      {/* Pick'em Profile Section */}
+      <Card className="rounded-3xl border-slate-800 bg-slate-900 p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-amber-400" />
+            <h2 className="text-lg font-bold text-white">Pick&apos;em fazy ligowej</h2>
+          </div>
+          {pickemSub?.points_awarded !== null && pickemSub?.points_awarded !== undefined && (
+            <span className="text-sm font-extrabold text-amber-400">
+              Zdobyte: {pickemSub.points_awarded} pkt
+            </span>
+          )}
+        </div>
+
+        {canViewPickem ? (
+          pickemSub ? (
+            <div className="space-y-3">
+              {/* FIRST */}
+              <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30">
+                <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider block mb-1">
+                  🥇 FIRST (1. miejsce)
+                </span>
+                <span className="text-sm font-bold text-white">
+                  {pickemSub.first_team_id ? teamsMap.get(pickemSub.first_team_id)?.name : "Brak"}
+                </span>
+              </div>
+
+              {/* TOP 8 */}
+              <div className="p-3 rounded-xl bg-blue-950/20 border border-blue-500/30">
+                <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider block mb-1">
+                  🔵 TOP 8 (miejsca 1–8)
+                </span>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {pickemSub.top8_team_ids?.map((tid) => (
+                    <span key={tid} className="px-2 py-0.5 rounded-md bg-blue-500/20 text-xs font-semibold text-blue-200">
+                      {teamsMap.get(tid)?.short_name || tid}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* OUT */}
+              <div className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/30">
+                <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider block mb-1">
+                  🔴 OUT (miejsca 25–36)
+                </span>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {pickemSub.out_team_ids?.map((tid) => (
+                    <span key={tid} className="px-2 py-0.5 rounded-md bg-rose-500/20 text-xs font-semibold text-rose-200">
+                      {teamsMap.get(tid)?.short_name || tid}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-500 italic">Użytkownik nie zapisał zestawu Pick&apos;em.</p>
+          )
+        ) : (
+          <div className="p-6 text-center rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-center gap-2 text-xs text-slate-400">
+            <Lock className="w-4 h-4 text-slate-400" />
+            <span>Zestaw Pick&apos;em gracza pozostaje ukryty do momentu zamknięcia typowania.</span>
+          </div>
+        )}
+      </Card>
+
+      {/* Match Predictions History */}
+      <Card className="rounded-3xl border-slate-800 bg-slate-900 p-6 shadow-xl">
+        <h2 className="text-lg font-bold text-white mb-4">Historia typów meczowych</h2>
+
+        {!rawMatchesPreds || rawMatchesPreds.length === 0 ? (
+          <div className="p-8 text-center text-xs text-slate-500 rounded-2xl bg-slate-950 border border-slate-800">
             Użytkownik nie obstawił jeszcze żadnego spotkania.
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            {(userPredictions as unknown as Array<PredictionRow & {
+            {(rawMatchesPreds as unknown as Array<PredictionRow & {
               match: MatchRow & {
                 home_team: TeamRow;
                 away_team: TeamRow;
@@ -158,9 +295,8 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
               return (
                 <div
                   key={pred.id}
-                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-[#101d36] border border-[#182645]"
+                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-slate-950 border border-slate-800"
                 >
-                  {/* Teams info */}
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-bold text-white">
                       {match.home_team?.short_name} vs {match.away_team?.short_name}
@@ -170,7 +306,6 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                     </span>
                   </div>
 
-                  {/* Prediction & Result */}
                   <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end">
                     {canViewScore ? (
                       <div className="flex items-center gap-2">
@@ -191,7 +326,6 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                       </div>
                     )}
 
-                    {/* Awarded Points Badge */}
                     {match.status === "finished" && pred.points_awarded !== null && (
                       <Badge
                         className={`text-xs font-bold ${

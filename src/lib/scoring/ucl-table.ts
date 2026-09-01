@@ -36,12 +36,19 @@ export interface UCLStandingRow {
   zone: "top8" | "playoff" | "eliminated";
 }
 
+export type UCLTableMode = "in-progress" | "final";
+
 /**
- * Calculates complete UEFA Champions League 36-team table with official tiebreaker criteria.
+ * Calculates complete UEFA Champions League 36-team table.
+ *
+ * @param teams List of 36 participating teams with metadata
+ * @param matches List of completed or live league stage matches
+ * @param mode "in-progress" (during season, standard primary criteria + shortName) or "final" (after all 144 matches, 10 official UEFA tiebreakers)
  */
 export function calculateUCLTable(
   teams: TableTeamData[],
-  matches: FinishedMatchData[]
+  matches: FinishedMatchData[],
+  mode: UCLTableMode = "in-progress"
 ): UCLStandingRow[] {
   // 1. Initialize stats for all teams
   const statsMap = new Map<
@@ -138,9 +145,9 @@ export function calculateUCLTable(
     }
   }
 
-  // 4. Sort using UEFA Tiebreaker Rules
+  // 4. Sort according to mode
   const sorted = Array.from(statsMap.values()).sort((a, b) => {
-    // 1. Points
+    // 1. Points (primary for both modes)
     if (b.points !== a.points) return b.points - a.points;
 
     // 2. Superior goal difference
@@ -158,6 +165,12 @@ export function calculateUCLTable(
     // 6. Higher number of away wins
     if (b.awayWins !== a.awayWins) return b.awayWins - a.awayWins;
 
+    if (mode === "in-progress") {
+      // In-progress tiebreaker: alphabetical by short name for stable display without incomplete strength of schedule
+      return a.team.shortName.localeCompare(b.team.shortName);
+    }
+
+    // FINAL mode: 10 official UEFA criteria
     // 7. Higher number of points obtained collectively by opponents
     if (b.opponentsPoints !== a.opponentsPoints) return b.opponentsPoints - a.opponentsPoints;
 
@@ -167,7 +180,7 @@ export function calculateUCLTable(
     // 9. Higher number of goals scored collectively by opponents
     if (b.opponentsGoalsFor !== a.opponentsGoalsFor) return b.opponentsGoalsFor - a.opponentsGoalsFor;
 
-    // 10. Lower disciplinary points (fair play)
+    // 10. Lower disciplinary points (fair play - lower is better)
     if (a.team.disciplinaryPoints !== b.team.disciplinaryPoints) {
       return a.team.disciplinaryPoints - b.team.disciplinaryPoints;
     }

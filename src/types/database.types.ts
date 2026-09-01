@@ -12,6 +12,7 @@ export type MatchStage = "league" | "playoff" | "round_of_16" | "quarter_finals"
 export type ScoringCategory = "exact" | "diff" | "outcome" | "incorrect";
 export type SpecialStatus = "open" | "locked" | "settled";
 export type SpecialTargetType = "team" | "player";
+export type PickemCategory = "first" | "top8" | "out";
 
 export interface Database {
   public: {
@@ -114,18 +115,21 @@ export interface Database {
           id: string;
           name: string;
           team_id: string;
+          is_active: boolean;
           created_at: string;
         };
         Insert: {
           id?: string;
           name: string;
           team_id: string;
+          is_active?: boolean;
           created_at?: string;
         };
         Update: {
           id?: string;
           name?: string;
           team_id?: string;
+          is_active?: boolean;
           created_at?: string;
         };
         Relationships: [
@@ -146,6 +150,7 @@ export interface Database {
           away_team_id: string;
           kickoff_at: string;
           is_betting_locked: boolean;
+          betting_locked_at: string | null;
           status: MatchStatus;
           home_score: number | null;
           away_score: number | null;
@@ -161,6 +166,7 @@ export interface Database {
           away_team_id: string;
           kickoff_at: string;
           is_betting_locked?: boolean;
+          betting_locked_at?: string | null;
           status?: MatchStatus;
           home_score?: number | null;
           away_score?: number | null;
@@ -176,6 +182,7 @@ export interface Database {
           away_team_id?: string;
           kickoff_at?: string;
           is_betting_locked?: boolean;
+          betting_locked_at?: string | null;
           status?: MatchStatus;
           home_score?: number | null;
           away_score?: number | null;
@@ -257,6 +264,8 @@ export interface Database {
           points_value: number;
           deadline_at: string;
           status: SpecialStatus;
+          is_locked: boolean;
+          locked_at: string | null;
           correct_team_id: string | null;
           correct_player_id: string | null;
           created_at: string;
@@ -270,6 +279,8 @@ export interface Database {
           points_value?: number;
           deadline_at: string;
           status?: SpecialStatus;
+          is_locked?: boolean;
+          locked_at?: string | null;
           correct_team_id?: string | null;
           correct_player_id?: string | null;
           created_at?: string;
@@ -283,11 +294,44 @@ export interface Database {
           points_value?: number;
           deadline_at?: string;
           status?: SpecialStatus;
+          is_locked?: boolean;
+          locked_at?: string | null;
           correct_team_id?: string | null;
           correct_player_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
+      };
+      special_prediction_correct_answers: {
+        Row: {
+          id: string;
+          category_id: string;
+          team_id: string | null;
+          player_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          category_id: string;
+          team_id?: string | null;
+          player_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          category_id?: string;
+          team_id?: string | null;
+          player_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "special_prediction_correct_answers_category_id_fkey";
+            columns: ["category_id"];
+            referencedRelation: "special_prediction_categories";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       special_predictions: {
         Row: {
@@ -328,6 +372,8 @@ export interface Database {
           season: string;
           deadline_at: string;
           status: SpecialStatus;
+          is_locked: boolean;
+          locked_at: string | null;
           created_at: string;
         };
         Insert: {
@@ -335,6 +381,8 @@ export interface Database {
           season?: string;
           deadline_at: string;
           status?: SpecialStatus;
+          is_locked?: boolean;
+          locked_at?: string | null;
           created_at?: string;
         };
         Update: {
@@ -342,6 +390,8 @@ export interface Database {
           season?: string;
           deadline_at?: string;
           status?: SpecialStatus;
+          is_locked?: boolean;
+          locked_at?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -350,9 +400,9 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
-          first_team_id: string;
-          top8_team_ids: string[];
-          out_team_ids: string[];
+          first_team_id: string | null;
+          top8_team_ids: string[] | null;
+          out_team_ids: string[] | null;
           points_awarded: number | null;
           created_at: string;
           updated_at: string;
@@ -360,9 +410,9 @@ export interface Database {
         Insert: {
           id?: string;
           user_id: string;
-          first_team_id: string;
-          top8_team_ids: string[];
-          out_team_ids: string[];
+          first_team_id?: string | null;
+          top8_team_ids?: string[] | null;
+          out_team_ids?: string[] | null;
           points_awarded?: number | null;
           created_at?: string;
           updated_at?: string;
@@ -370,14 +420,51 @@ export interface Database {
         Update: {
           id?: string;
           user_id?: string;
-          first_team_id?: string;
-          top8_team_ids?: string[];
-          out_team_ids?: string[];
+          first_team_id?: string | null;
+          top8_team_ids?: string[] | null;
+          out_team_ids?: string[] | null;
           points_awarded?: number | null;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [];
+      };
+      pickem_selections: {
+        Row: {
+          id: string;
+          submission_id: string;
+          team_id: string;
+          category: PickemCategory;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          submission_id: string;
+          team_id: string;
+          category: PickemCategory;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          submission_id?: string;
+          team_id?: string;
+          category?: PickemCategory;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pickem_selections_submission_id_fkey";
+            columns: ["submission_id"];
+            referencedRelation: "pickem_submissions";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pickem_selections_team_id_fkey";
+            columns: ["team_id"];
+            referencedRelation: "teams";
+            referencedColumns: ["id"];
+          }
+        ];
       };
       announcements: {
         Row: {
@@ -433,6 +520,24 @@ export interface Database {
           content?: string;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      comment_rate_limits: {
+        Row: {
+          id: string;
+          user_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -519,6 +624,31 @@ export interface Database {
           p_away_score: number;
         };
         Returns: void;
+      };
+      settle_special_prediction_category: {
+        Args: {
+          p_category_id: string;
+          p_correct_team_ids: string[];
+          p_correct_player_ids: string[];
+        };
+        Returns: void;
+      };
+      settle_pickem: {
+        Args: {
+          p_final_standings: string[];
+        };
+        Returns: void;
+      };
+      check_and_record_comment_attempt: {
+        Args: {
+          p_user_id: string;
+          p_max_attempts?: number;
+          p_window_seconds?: number;
+        };
+        Returns: {
+          is_allowed: boolean;
+          remaining_seconds: number;
+        }[];
       };
     };
     Enums: {

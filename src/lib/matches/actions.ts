@@ -425,16 +425,23 @@ export async function getMatchesWithPredictionsAction(): Promise<MatchWithTeams[
 }
 
 /**
- * Fetches general leaderboard based on actual finalized match points
+ * Fetches general leaderboard with TOTAL = MATCH POINTS + SPECIAL POINTS + PICK'EM POINTS
  */
 export async function getLeaderboardAction(): Promise<LeaderboardEntry[]> {
   const supabase = await createClient();
 
-  // 1. Fetch all active profiles
-  const { data: rawProfiles, error: profErr } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("is_active", true);
+  // 1. Fetch all active profiles, predictions, special predictions, and pickem submissions in parallel
+  const [
+    { data: rawProfiles, error: profErr },
+    { data: rawPredictions },
+    { data: rawSpecialPreds },
+    { data: rawPickemSubs },
+  ] = await Promise.all([
+    supabase.from("profiles").select("*").eq("is_active", true),
+    supabase.from("predictions").select("user_id, points_awarded, scoring_category"),
+    supabase.from("special_predictions").select("user_id, points_awarded"),
+    supabase.from("pickem_submissions").select("user_id, points_awarded"),
+  ]);
 
   const profiles = (rawProfiles || []) as unknown as ProfileRow[];
 
@@ -443,16 +450,15 @@ export async function getLeaderboardAction(): Promise<LeaderboardEntry[]> {
     return [];
   }
 
-  // 2. Fetch all predictions
-  const { data: rawPredictions } = await supabase
-    .from("predictions")
-    .select("user_id, points_awarded, scoring_category");
-
   const predictions = (rawPredictions || []) as unknown as PredictionRow[];
+  const specialPreds = (rawSpecialPreds || []) as unknown as Array<{ user_id: string; points_awarded: number | null }>;
+  const pickemSubs = (rawPickemSubs || []) as unknown as Array<{ user_id: string; points_awarded: number | null }>;
 
   // Aggregate stats per user
   const statsMap = new Map<string, {
     matchPoints: number;
+    specialPoints: number;
+    pickemPoints: number;
     exact: number;
     diff: number;
     outcome: number;
@@ -461,9 +467,19 @@ export async function getLeaderboardAction(): Promise<LeaderboardEntry[]> {
   }>();
 
   profiles.forEach((p) => {
-    statsMap.set(p.id, { matchPoints: 0, exact: 0, diff: 0, outcome: 0, incorrect: 0, count: 0 });
+    statsMap.set(p.id, {
+      matchPoints: 0,
+      specialPoints: 0,
+      pickemPoints: 0,
+      exact: 0,
+      diff: 0,
+      outcome: 0,
+      incorrect: 0,
+      count: 0,
+    });
   });
 
+  // 1. Match points
   predictions.forEach((pred) => {
     const stats = statsMap.get(pred.user_id);
     if (stats && pred.points_awarded !== null && pred.points_awarded !== undefined) {
@@ -476,9 +492,26 @@ export async function getLeaderboardAction(): Promise<LeaderboardEntry[]> {
     }
   });
 
+  // 2. Special predictions points
+  specialPreds.forEach((sp) => {
+    const stats = statsMap.get(sp.user_id);
+    if (stats && sp.points_awarded !== null && sp.points_awarded !== undefined) {
+      stats.specialPoints += sp.points_awarded;
+    }
+  });
+
+  // 3. Pick'em points
+  pickemSubs.forEach((ps) => {
+    const stats = statsMap.get(ps.user_id);
+    if (stats && ps.points_awarded !== null && ps.points_awarded !== undefined) {
+      stats.pickemPoints += ps.points_awarded;
+    }
+  });
+
   const entries: LeaderboardEntry[] = profiles.map((p) => {
     const s = statsMap.get(p.id)!;
     const accuracy = s.count > 0 ? Math.round(((s.exact + s.diff + s.outcome) / s.count) * 100) : 0;
+    const totalPoints = s.matchPoints + s.specialPoints + s.pickemPoints;
 
     return {
       rank: 1,
@@ -488,9 +521,9 @@ export async function getLeaderboardAction(): Promise<LeaderboardEntry[]> {
       lastName: p.last_name,
       avatarUrl: p.avatar_url,
       matchPoints: s.matchPoints,
-      specialPoints: 0,
-      pickemPoints: 0,
-      totalPoints: s.matchPoints,
+      specialPoints: s.specialPoints,
+      pickemPoints: s.pickemPoints,
+      totalPoints,
       exactScoresCount: s.exact,
       diffScoresCount: s.diff,
       outcomeScoresCount: s.outcome,
