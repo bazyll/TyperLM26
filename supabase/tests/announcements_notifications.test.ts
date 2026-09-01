@@ -240,28 +240,110 @@ describe("Announcements & Unread Notifications Logic", () => {
       expect(count).toBe(0);
     });
 
-    it("resets unread count to 0 after user visits /ogloszenia (mark as seen)", () => {
-      let userLastSeen: string | null = null;
-      expect(calculateUnreadCount(mockFeed, userLastSeen)).toBe(2);
-
-      // User visits /ogloszenia
-      userLastSeen = "2026-09-01T17:00:00Z";
-      expect(calculateUnreadCount(mockFeed, userLastSeen)).toBe(0);
-
-      // Later, admin posts a 3rd announcement at 18:00
-      const updatedFeed = [
-        ...mockFeed,
+    it("handles race condition: user opens feed with A and B, seen marker sets to MAX(B.created_at), later C is created -> C is unread", () => {
+      const feedAtOpen: MockAnnouncement[] = [
         {
-          id: "ann-3",
+          id: "ann-A",
           authorId: "admin-1",
-          title: "Ogłoszenie 3",
-          content: "Nowy komunikat",
+          title: "Ogłoszenie A",
+          content: "Treść A",
           isPinned: false,
-          createdAt: "2026-09-01T18:00:00Z",
-          updatedAt: "2026-09-01T18:00:00Z",
+          createdAt: "2026-09-01T10:00:00Z",
+          updatedAt: "2026-09-01T10:00:00Z",
+        },
+        {
+          id: "ann-B",
+          authorId: "admin-1",
+          title: "Ogłoszenie B",
+          content: "Treść B",
+          isPinned: true,
+          createdAt: "2026-09-01T12:00:00Z",
+          updatedAt: "2026-09-01T12:00:00Z",
         },
       ];
-      expect(calculateUnreadCount(updatedFeed, userLastSeen)).toBe(1);
+
+      // Client calculates MAX(created_at) from the received feed items (B is latest: 12:00:00Z)
+      const maxFeedCreatedAt = feedAtOpen.reduce((max, ann) => {
+        return new Date(ann.createdAt).getTime() > new Date(max).getTime() ? ann.createdAt : max;
+      }, feedAtOpen[0].createdAt);
+
+      expect(maxFeedCreatedAt).toBe("2026-09-01T12:00:00Z");
+
+      // Server sets user.announcements_last_seen_at = maxFeedCreatedAt
+      let userLastSeenAt: string | null = maxFeedCreatedAt;
+
+      // Currently in feedAtOpen, unread is 0
+      expect(calculateUnreadCount(feedAtOpen, userLastSeenAt)).toBe(0);
+
+      // Now admin publishes announcement C at 12:05:00Z
+      const feedWithC: MockAnnouncement[] = [
+        ...feedAtOpen,
+        {
+          id: "ann-C",
+          authorId: "admin-1",
+          title: "Ogłoszenie C",
+          content: "Treść C",
+          isPinned: false,
+          createdAt: "2026-09-01T12:05:00Z",
+          updatedAt: "2026-09-01T12:05:00Z",
+        },
+      ];
+
+      // Even if user's browser is still open, C is unread because C.created_at (12:05) > lastSeenAt (12:00)
+      const unreadCount = calculateUnreadCount(feedWithC, userLastSeenAt);
+      expect(unreadCount).toBe(1);
+    });
+
+    it("server-side safely caps client-supplied timestamp so it cannot exceed DB max created_at", () => {
+      const dbAnnouncements: MockAnnouncement[] = [
+        {
+          id: "ann-A",
+          authorId: "admin-1",
+          title: "Ogłoszenie A",
+          content: "Treść A",
+          isPinned: false,
+          createdAt: "2026-09-01T10:00:00Z",
+          updatedAt: "2026-09-01T10:00:00Z",
+        },
+        {
+          id: "ann-B",
+          authorId: "admin-1",
+          title: "Ogłoszenie B",
+          content: "Treść B",
+          isPinned: true,
+          createdAt: "2026-09-01T12:00:00Z",
+          updatedAt: "2026-09-01T12:00:00Z",
+        },
+      ];
+
+      const resolveSafeSeenTimestamp = (
+        dbLatestCreatedAt: string | null,
+        clientSuppliedTime?: string
+      ) => {
+        if (!dbLatestCreatedAt) return null;
+        const maxDbTime = new Date(dbLatestCreatedAt).getTime();
+        let target = dbLatestCreatedAt;
+        if (clientSuppliedTime) {
+          const clientTime = new Date(clientSuppliedTime).getTime();
+          if (!isNaN(clientTime) && clientTime <= maxDbTime) {
+            target = clientSuppliedTime;
+          }
+        }
+        return target;
+      };
+
+      const dbMaxCreatedAt = "2026-09-01T12:00:00Z";
+
+      // Case 1: Client sends a malicious future date (e.g. year 2099)
+      const maliciousFutureTime = "2099-01-01T00:00:00Z";
+      const resolvedMalicious = resolveSafeSeenTimestamp(dbMaxCreatedAt, maliciousFutureTime);
+      expect(resolvedMalicious).toBe("2026-09-01T12:00:00Z"); // Capped to DB max!
+
+      // Case 2: Client sends an older timestamp from an older cached page (e.g. 10:00:00Z)
+      const olderTime = "2026-09-01T10:00:00Z";
+      const resolvedOlder = resolveSafeSeenTimestamp(dbMaxCreatedAt, olderTime);
+      expect(resolvedOlder).toBe("2026-09-01T10:00:00Z"); // Allowed since <= maxDbTime
     });
   });
 });
+

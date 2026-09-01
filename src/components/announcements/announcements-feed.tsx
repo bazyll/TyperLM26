@@ -19,10 +19,16 @@ interface Props {
 export function AnnouncementsFeed({ initialAnnouncements }: Props) {
   const [announcements] = useState<AnnouncementItem[]>(initialAnnouncements);
 
-  // Mark all announcements as seen when visiting /ogloszenia
+  // Mark announcements as seen up to the latest announcement in the loaded feed
   useEffect(() => {
-    markAnnouncementsAsSeenAction();
-  }, []);
+    if (initialAnnouncements.length > 0) {
+      const maxCreatedAt = initialAnnouncements.reduce((max, ann) => {
+        return new Date(ann.createdAt).getTime() > new Date(max).getTime() ? ann.createdAt : max;
+      }, initialAnnouncements[0].createdAt);
+
+      markAnnouncementsAsSeenAction(maxCreatedAt);
+    }
+  }, [initialAnnouncements]);
 
   if (announcements.length === 0) {
     return (

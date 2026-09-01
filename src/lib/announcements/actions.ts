@@ -84,23 +84,59 @@ export async function getUnreadAnnouncementsCountAction(): Promise<number> {
 }
 
 /**
- * Marks announcements as seen for the current user up to now()
+ * Marks announcements as seen for the current user up to the latest announcement in the feed (MAX created_at)
+ * Server-side safely caps the timestamp so clients cannot set arbitrary future times.
  */
-export async function markAnnouncementsAsSeenAction(): Promise<ActionResult> {
+export async function markAnnouncementsAsSeenAction(upToCreatedAt?: string): Promise<ActionResult> {
   const currentUser = await getCurrentUserProfile();
   if (!currentUser) {
     return { success: false, error: "Wymagane logowanie." };
   }
 
+  const supabase = await createClient();
   const adminSupabase = createAdminClient();
-  const seenTimestamp = new Date().toISOString();
 
   try {
+    // 1. Fetch the latest actual announcement created_at from DB
+    const { data: latestAnnRaw } = await supabase
+      .from("announcements")
+      .select("created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const latestAnn = latestAnnRaw as { created_at: string } | null;
+
+    if (!latestAnn?.created_at) {
+      // No announcements exist in DB
+      return { success: true };
+    }
+
+    const maxDbTime = new Date(latestAnn.created_at).getTime();
+    let targetTimestamp = latestAnn.created_at;
+
+    // If client supplied upToCreatedAt from rendered feed, ensure it does not exceed DB's max created_at
+    if (upToCreatedAt) {
+      const clientTime = new Date(upToCreatedAt).getTime();
+      if (!isNaN(clientTime) && clientTime <= maxDbTime) {
+        targetTimestamp = upToCreatedAt;
+      }
+    }
+
+    // Only update if targetTimestamp is strictly newer than user's current announcements_last_seen_at
+    if (currentUser.announcementsLastSeenAt) {
+      const currentSeenTime = new Date(currentUser.announcementsLastSeenAt).getTime();
+      const targetTime = new Date(targetTimestamp).getTime();
+      if (currentSeenTime >= targetTime) {
+        return { success: true };
+      }
+    }
+
     const { error } = await adminSupabase
       .from("profiles")
       .update({
-        announcements_last_seen_at: seenTimestamp,
-        updated_at: seenTimestamp,
+        announcements_last_seen_at: targetTimestamp,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", currentUser.id);
 
