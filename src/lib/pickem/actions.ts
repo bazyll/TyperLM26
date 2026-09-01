@@ -174,7 +174,9 @@ export async function savePickemSubmissionAction(
       .maybeSingle();
 
     const config = rawConfig as unknown as ConfigRow | null;
-    if (cfgErr || !config) return { success: false, error: "Konfiguracja Pick'em jest niedostępna." };
+    if (cfgErr || !config) {
+      return { success: false, error: "Pick'em nie został jeszcze skonfigurowany przez administratora." };
+    }
 
     if (new Date(config.deadline_at).getTime() <= Date.now() || config.is_locked) {
       return { success: false, error: "Czas na zapisanie typów Pick'em już minął." };

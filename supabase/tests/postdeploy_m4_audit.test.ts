@@ -36,8 +36,9 @@ describe("Milestone 4 Post-Deployment Audit Verification", () => {
 
   // 2. Audit Point 2: pickem_submissions Mandatory config_id & UNIQUE(user_id, config_id)
   describe("Audit Point 2: Mandatory config_id & UNIQUE(user_id, config_id)", () => {
-    it("enforces config_id NOT NULL on pickem_submissions with strict backfill", () => {
+    it("enforces config_id NOT NULL on pickem_submissions with safe conditional backfill", () => {
       expect(m4HardeningMigration).toContain("ALTER TABLE public.pickem_submissions ALTER COLUMN config_id SET NOT NULL;");
+      expect(m4HardeningMigration).toContain("IF EXISTS (\n    SELECT 1\n    FROM public.pickem_submissions\n    WHERE config_id IS NULL\n  ) THEN");
       expect(m4HardeningMigration).toContain("RAISE EXCEPTION 'Cannot backfill pickem_submissions: no pickem_config record found'");
     });
 

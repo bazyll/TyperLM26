@@ -38,16 +38,30 @@ DROP POLICY IF EXISTS "pickem_selections_admin_all" ON public.pickem_selections;
 ALTER TABLE public.pickem_submissions
 ADD COLUMN IF NOT EXISTS config_id UUID REFERENCES public.pickem_config(id) ON DELETE RESTRICT;
 
--- Strict backfill: assign current pickem_config, abort if no config exists
+-- Safe conditional backfill: only execute if existing submissions without config_id actually exist
 DO $$
 DECLARE
   v_default_config_id UUID;
 BEGIN
-  SELECT id INTO v_default_config_id FROM public.pickem_config ORDER BY created_at ASC LIMIT 1;
-  IF v_default_config_id IS NULL THEN
-    RAISE EXCEPTION 'Cannot backfill pickem_submissions: no pickem_config record found';
+  IF EXISTS (
+    SELECT 1
+    FROM public.pickem_submissions
+    WHERE config_id IS NULL
+  ) THEN
+    SELECT id
+    INTO v_default_config_id
+    FROM public.pickem_config
+    ORDER BY created_at ASC
+    LIMIT 1;
+
+    IF v_default_config_id IS NULL THEN
+      RAISE EXCEPTION 'Cannot backfill pickem_submissions: no pickem_config record found';
+    END IF;
+
+    UPDATE public.pickem_submissions
+    SET config_id = v_default_config_id
+    WHERE config_id IS NULL;
   END IF;
-  UPDATE public.pickem_submissions SET config_id = v_default_config_id WHERE config_id IS NULL;
 END $$;
 
 -- Enforce NOT NULL on config_id
