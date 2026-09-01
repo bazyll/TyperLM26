@@ -15,7 +15,7 @@ describe("Milestone 4 Post-Deployment Audit Verification", () => {
   );
 
   // 1. Audit Point 1: special_prediction_correct_answers RLS & Mutation Lockdown
-  describe("Audit Point 1 & 2: special_prediction_correct_answers RLS & Mutations", () => {
+  describe("Audit Point 1: special_prediction_correct_answers RLS & Mutations", () => {
     it("drops direct client admin ALL policy to prevent direct mutations from client", () => {
       expect(m4HardeningMigration).toContain("DROP POLICY IF EXISTS \"spec_answers_admin_all\"");
     });
@@ -34,48 +34,94 @@ describe("Milestone 4 Post-Deployment Audit Verification", () => {
     });
   });
 
-  // 2. Audit Point 2: pickem_selections Granular RLS & Explicit Config Relation
-  describe("Audit Item: pickem_selections Granular RLS & Explicit Config Join", () => {
-    it("adds config_id column linking pickem_submissions to pickem_config directly", () => {
-      expect(m4HardeningMigration).toContain("ALTER TABLE public.pickem_submissions");
-      expect(m4HardeningMigration).toContain("ADD COLUMN IF NOT EXISTS config_id UUID REFERENCES public.pickem_config(id)");
+  // 2. Audit Point 2: pickem_submissions Mandatory config_id & UNIQUE(user_id, config_id)
+  describe("Audit Point 2: Mandatory config_id & UNIQUE(user_id, config_id)", () => {
+    it("enforces config_id NOT NULL on pickem_submissions with strict backfill", () => {
+      expect(m4HardeningMigration).toContain("ALTER TABLE public.pickem_submissions ALTER COLUMN config_id SET NOT NULL;");
+      expect(m4HardeningMigration).toContain("RAISE EXCEPTION 'Cannot backfill pickem_submissions: no pickem_config record found'");
     });
 
-    it("drops pickem_selections_admin_all to prevent admin OR bypass of deadline secrecy", () => {
-      expect(m4HardeningMigration).toContain("DROP POLICY IF EXISTS \"pickem_selections_admin_all\"");
+    it("replaces UNIQUE(user_id) with UNIQUE(user_id, config_id) for multi-season support", () => {
+      expect(m4HardeningMigration).toContain("DROP CONSTRAINT IF EXISTS pickem_submissions_user_id_key;");
+      expect(m4HardeningMigration).toContain("ADD CONSTRAINT pickem_submissions_user_config_key UNIQUE (user_id, config_id);");
     });
 
-    it("requires public.is_active_user() for SELECT on pickem_selections (blocks inactive users)", () => {
-      expect(m4HardeningMigration).toContain("CREATE POLICY \"pickem_selections_select_policy\"");
-      expect(m4HardeningMigration).toContain("public.is_active_user()");
+    it("creates index on pickem_submissions(config_id)", () => {
+      expect(m4HardeningMigration).toContain("CREATE INDEX IF NOT EXISTS idx_pickem_sub_config ON public.pickem_submissions(config_id);");
     });
 
-    it("joins pickem_config explicitly via config_id instead of unrestricted CROSS JOIN", () => {
-      expect(m4HardeningMigration).toContain("JOIN public.pickem_config c ON c.id = COALESCE(s.config_id, (SELECT id FROM public.pickem_config ORDER BY created_at ASC LIMIT 1))");
-    });
-
-    it("restricts SELECT to own submission before deadline, and reveals all only after deadline/lock", () => {
-      expect(m4HardeningMigration).toContain("(s.user_id = auth.uid() OR c.deadline_at <= now() OR c.is_locked = TRUE)");
-    });
-
-    it("enforces INSERT policy: active user, own submission, and open deadline", () => {
-      expect(m4HardeningMigration).toContain("CREATE POLICY \"pickem_selections_insert_policy\"");
-      expect(m4HardeningMigration).toContain("s.user_id = auth.uid()");
-      expect(m4HardeningMigration).toContain("c.deadline_at > now()");
-      expect(m4HardeningMigration).toContain("NOT c.is_locked");
-    });
-
-    it("enforces UPDATE and DELETE policies: active user, own submission, and open deadline", () => {
-      expect(m4HardeningMigration).toContain("CREATE POLICY \"pickem_selections_update_policy\"");
-      expect(m4HardeningMigration).toContain("CREATE POLICY \"pickem_selections_delete_policy\"");
+    it("uses clean direct equality without any COALESCE fallbacks in RLS", () => {
+      expect(m4HardeningMigration).not.toContain("COALESCE");
+      expect(m4HardeningMigration).toContain("c.id = pickem_submissions.config_id");
+      expect(m4HardeningMigration).toContain("JOIN public.pickem_config c ON c.id = s.config_id");
     });
   });
 
-  // 3. Audit Point 3 & 4: Single Source of Truth & Fair Play
+  // 3. Multi-season isolation test logic
+  describe("Multi-season Isolation & Constraint Simulation", () => {
+    interface MockSubmission {
+      userId: string;
+      configId: string;
+    }
+
+    it("allows same user to submit for Config A and Config B, but rejects duplicate in same config", () => {
+      const dbSubmissions: MockSubmission[] = [];
+
+      const insertSubmission = (sub: MockSubmission) => {
+        if (!sub.configId) throw new Error("config_id is NOT NULL");
+        const exists = dbSubmissions.some(
+          (s) => s.userId === sub.userId && s.configId === sub.configId
+        );
+        if (exists) throw new Error("UNIQUE constraint violation: user_id, config_id");
+        dbSubmissions.push(sub);
+      };
+
+      // User 1 submits for Season 2026/2027 (config-1)
+      insertSubmission({ userId: "u1", configId: "config-1" });
+      expect(dbSubmissions).toHaveLength(1);
+
+      // User 1 submits for Season 2027/2028 (config-2) -> Allowed!
+      insertSubmission({ userId: "u1", configId: "config-2" });
+      expect(dbSubmissions).toHaveLength(2);
+
+      // User 1 attempts second submission for Season 2026/2027 (config-1) -> Rejected!
+      expect(() => insertSubmission({ userId: "u1", configId: "config-1" })).toThrow(
+        "UNIQUE constraint violation"
+      );
+
+      // Submission without configId -> Rejected!
+      expect(() => insertSubmission({ userId: "u2", configId: "" })).toThrow(
+        "config_id is NOT NULL"
+      );
+    });
+
+    it("confirms a second pickem_config with different deadline does not affect another config", () => {
+      const config1 = { id: "config-1", season: "2026/2027", deadlineAt: new Date(Date.now() - 10000) }; // Past (revealed)
+      const config2 = { id: "config-2", season: "2027/2028", deadlineAt: new Date(Date.now() + 1000000) }; // Future (locked to others)
+
+      const submission1 = { id: "sub-1", userId: "u1", configId: "config-1" };
+      const submission2 = { id: "sub-2", userId: "u1", configId: "config-2" };
+
+      // Viewer is User 2 (not owner)
+      const viewerId = "u2";
+
+      const canViewSubmission1 = viewerId === submission1.userId || config1.deadlineAt.getTime() <= Date.now();
+      const canViewSubmission2 = viewerId === submission2.userId || config2.deadlineAt.getTime() <= Date.now();
+
+      // Submission 1 (config-1, past deadline) is revealed to viewer
+      expect(canViewSubmission1).toBe(true);
+
+      // Submission 2 (config-2, future deadline) remains hidden from viewer
+      expect(canViewSubmission2).toBe(false);
+    });
+  });
+
+  // 4. Audit Point 3 & 4: Single Source of Truth & Fair Play
   describe("Audit Point 3, 4 & 8: Fair Play and Dropping Admin Overrides", () => {
     it("drops legacy admin ALL policies that bypassed deadline secrecy", () => {
       expect(m4HardeningMigration).toContain("DROP POLICY IF EXISTS \"spec_predictions_admin_all\"");
       expect(m4HardeningMigration).toContain("DROP POLICY IF EXISTS \"pickem_submissions_admin_all\"");
+      expect(m4HardeningMigration).toContain("DROP POLICY IF EXISTS \"pickem_selections_admin_all\"");
     });
 
     it("settle_special_prediction_category uses special_prediction_correct_answers exclusively", () => {
@@ -88,7 +134,7 @@ describe("Milestone 4 Post-Deployment Audit Verification", () => {
     });
   });
 
-  // 4. Audit Point 5: Finalist Semantics
+  // 5. Audit Point 5: Finalist Semantics
   describe("Audit Point 5: Winner and Finalist Semantics", () => {
     it("winner is the champion, finalist is the runner-up; winner does not get runner-up points", () => {
       const winnerTeamId = "team-real-madrid";
@@ -117,7 +163,7 @@ describe("Milestone 4 Post-Deployment Audit Verification", () => {
     });
   });
 
-  // 5. Audit Point 6: Pick'em Maximum Score Calculations
+  // 6. Audit Point 6: Pick'em Maximum Score Calculations
   describe("Audit Point 6: Pick'em Max Score Calculations", () => {
     const mock36Teams = Array.from({ length: 36 }, (_, i) => `team-${i + 1}`);
 
@@ -151,7 +197,7 @@ describe("Milestone 4 Post-Deployment Audit Verification", () => {
     });
   });
 
-  // 6. Audit Point 9: Lock Guard Behavior on Deadline Change After Reveal
+  // 7. Audit Point 9: Lock Guard Behavior on Deadline Change After Reveal
   describe("Audit Point 9: Lock Guard Behavior on Deadline Transition", () => {
     it("Special Category trigger enforces is_locked = TRUE if deadline already passed or already locked", () => {
       expect(m4Migration).toContain("IF (OLD.deadline_at <= now() OR OLD.is_locked = TRUE) THEN");

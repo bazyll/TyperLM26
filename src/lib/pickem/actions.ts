@@ -9,7 +9,7 @@ import { ActionResult } from "@/lib/auth/schemas";
 import { savePickemSchema, updatePickemDeadlineSchema } from "./schemas";
 import { validatePickemSubmission } from "@/lib/scoring/pickem";
 import { calculateUCLTable } from "@/lib/scoring/ucl-table";
-import { PickemSubmissionWithDetails } from "@/types";
+import { PickemSubmissionWithDetails, PickemSelectionItem } from "@/types";
 import { Database } from "@/types/database.types";
 
 type TeamRow = Database["public"]["Tables"]["teams"]["Row"];
@@ -51,14 +51,19 @@ export async function getPickemDataAction(): Promise<{
   const config = rawConfig as unknown as ConfigRow | null;
   const teams = (rawTeams || []) as unknown as TeamRow[];
 
-  // 2. Fetch all accessible submissions
-  const { data: rawSubmissions } = await supabase
+  // 2. Fetch all accessible submissions for this config
+  const subQuery = supabase
     .from("pickem_submissions")
     .select(`
       *,
       profile:profiles(*)
     `);
 
+  if (config) {
+    subQuery.eq("config_id", config.id);
+  }
+
+  const { data: rawSubmissions } = await subQuery;
   const submissions = (rawSubmissions || []) as unknown as Array<SubmissionRow & { profile: ProfileRow }>;
 
   // 3. Fetch all accessible selections
@@ -76,8 +81,8 @@ export async function getPickemDataAction(): Promise<{
   teams.forEach((t) => teamMap.set(t.id, t));
 
   // Build user submission
-  const mySub = currentUser ? submissions.find((s) => s.user_id === currentUser.id) : undefined;
   let userSubmission: PickemSubmissionWithDetails | null = null;
+  const mySub = currentUser ? submissions.find((s) => s.user_id === currentUser.id) : undefined;
 
   if (mySub) {
     const mySelections = selectionsMap.get(mySub.id) || [];
@@ -85,15 +90,16 @@ export async function getPickemDataAction(): Promise<{
     const top8Sels = mySelections.filter((s) => s.category === "top8");
     const outSels = mySelections.filter((s) => s.category === "out");
 
-    const explicitTeamIds = new Set(mySelections.map((s) => s.team_id));
-    const items = teams.map((t) => {
-      const found = mySelections.find((s) => s.team_id === t.id);
-      const cat = found ? found.category : "middle";
+    const items: PickemSelectionItem[] = mySelections.map((s) => {
+      const t = teamMap.get(s.team_id);
+      const cat = s.category;
       return {
-        teamId: t.id,
-        teamName: t.name,
-        teamCode: t.code,
-        teamLogoUrl: t.logo_url,
+        id: s.id,
+        submissionId: s.submission_id,
+        teamId: s.team_id,
+        teamName: t?.name || "Nieznana drużyna",
+        teamCode: t?.code || "???",
+        teamLogoUrl: t?.logo_url || "",
         category: cat as "first" | "top8" | "out" | "middle",
       };
     });
@@ -174,7 +180,7 @@ export async function savePickemSubmissionAction(
       return { success: false, error: "Czas na zapisanie typów Pick'em już minął." };
     }
 
-    // 2. Upsert submission row
+    // 2. Upsert submission row explicitly with config_id and UNIQUE(user_id, config_id)
     const { data: rawSub, error: subErr } = await (supabase.from("pickem_submissions") as unknown as {
       upsert: (values: Record<string, unknown>, opts: { onConflict: string }) => {
         select: (cols: string) => { single: () => Promise<{ data: { id: string } | null; error: unknown }> };
@@ -189,7 +195,7 @@ export async function savePickemSubmissionAction(
           out_team_ids: outTeamIds,
           updated_at: new Date().toISOString(),
         },
-        { onConflict: "user_id" }
+        { onConflict: "user_id,config_id" }
       )
       .select("id")
       .single();
