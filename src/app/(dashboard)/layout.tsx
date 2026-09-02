@@ -37,17 +37,15 @@ export default async function DashboardLayout({
         points: 1250,
       };
 
-  const isAdmin = userProp.role === "admin";
-
   return (
     <div className="flex min-h-screen bg-[#070b14]">
-      {/* Desktop Sidebar */}
-      <Sidebar isAdmin={isAdmin} />
+      {/* Desktop Sidebar with Unread Announcements Indicator */}
+      <Sidebar unreadCount={unreadCount} />
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
         {/* Top Header */}
-        <Header user={userProp} unreadCount={unreadCount} />
+        <Header user={userProp} />
 
         {/* Page Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto">

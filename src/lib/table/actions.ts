@@ -82,3 +82,20 @@ export async function getUCLTableAction(): Promise<{
     mode,
   };
 }
+
+/**
+ * Fetches UCL Top Scorers ranking.
+ */
+export async function getUclScorersAction() {
+  const { getUclScorersRanking } = await import("@/lib/goal-api/scorers");
+  return getUclScorersRanking();
+}
+
+/**
+ * Fetches UCL Top Assists ranking.
+ */
+export async function getUclAssistsAction() {
+  const { getUclAssistsRanking } = await import("@/lib/goal-api/scorers");
+  return getUclAssistsRanking();
+}
+

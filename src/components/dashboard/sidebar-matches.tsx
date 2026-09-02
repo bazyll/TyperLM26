@@ -1,15 +1,43 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronRight, Clock } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TeamLogo } from "@/components/team-logo";
 import { MatchWithTeams } from "@/types";
+import { useRealtimeMatches } from "@/lib/supabase/use-realtime-matches";
 
 interface SidebarMatchesProps {
   matches: MatchWithTeams[];
 }
 
-export function SidebarMatches({ matches }: SidebarMatchesProps) {
+export function SidebarMatches({ matches: initialMatches }: SidebarMatchesProps) {
+  const [matches, setMatches] = useState<MatchWithTeams[]>(initialMatches);
+
+  useEffect(() => {
+    setMatches(initialMatches);
+  }, [initialMatches]);
+
+  useRealtimeMatches({
+    onMatchUpdate: (updated) => {
+      setMatches((prev) =>
+        prev.map((m) =>
+          m.id === updated.id
+            ? {
+                ...m,
+                homeScore: updated.home_score ?? m.homeScore,
+                awayScore: updated.away_score ?? m.awayScore,
+                status: updated.status,
+                isManualOverride: updated.is_manual_override,
+                isBettingLocked: updated.is_betting_locked,
+              }
+            : m
+        )
+      );
+    },
+  });
   return (
     <Card className="rounded-3xl border-[#182645] bg-[#0c1527] overflow-hidden shadow-xl">
       <CardHeader className="p-5 pb-3">
@@ -65,7 +93,7 @@ export function SidebarMatches({ matches }: SidebarMatchesProps) {
 
                     {isLive ? (
                       <Badge variant="destructive" className="animate-pulse text-[10px] px-1.5 py-0 font-bold">
-                        LIVE • {match.liveMinute || 0}&apos;
+                        LIVE
                       </Badge>
                     ) : isFinished ? (
                       <Badge variant="secondary" className="bg-slate-800 text-slate-300 text-[10px] px-1.5 py-0">

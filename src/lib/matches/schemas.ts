@@ -29,6 +29,7 @@ export const updateMatchSchema = z.object({
   status: z.enum(["scheduled", "live", "finished", "postponed", "cancelled"]),
   homeScore: scoreInputSchema.optional().nullable(),
   awayScore: scoreInputSchema.optional().nullable(),
+  winnerTeamId: z.string().uuid().optional().nullable(),
   liveMinute: z.number().int().min(0).max(130).optional().nullable(),
   isBettingLocked: z.boolean().optional(),
 }).refine((data) => data.homeTeamId !== data.awayTeamId, {

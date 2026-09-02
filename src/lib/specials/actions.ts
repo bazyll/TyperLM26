@@ -11,7 +11,9 @@ import {
   saveAllSpecialPredictionsSchema,
   updateSpecialDeadlineSchema,
   settleSpecialCategorySchema,
+  confirmSpecialSettlementSchema,
 } from "./schemas";
+import { evaluateSpecialPredictionsSettlement, SpecialPredictionsSettlementReport } from "./settlement";
 import { SpecialCategoryWithPrediction } from "@/types";
 import { Database } from "@/types/database.types";
 import { getAvatarSignedUrls } from "@/lib/supabase/storage";
@@ -50,7 +52,7 @@ export async function getSpecialCategoriesWithPredictionsAction(): Promise<Speci
     supabase.from("players").select("id, name, team_id"),
   ]);
 
-  const teamsMap = new Map<string, { name: string; logoUrl: string }>();
+  const teamsMap = new Map<string, { name: string; logoUrl: string | null }>();
   (rawTeams as unknown as TeamRow[] || []).forEach((t) => {
     teamsMap.set(t.id, { name: t.name, logoUrl: t.logo_url });
   });
@@ -241,24 +243,6 @@ export async function saveAllSpecialPredictionsAction(
     const catMap = new Map<string, CategoryRow>();
     categories.forEach((c) => catMap.set(c.id, c));
 
-    // Check winner vs finalist collision
-    const winnerCat = categories.find((c) => c.slug === "winner");
-    const finalistCat = categories.find((c) => c.slug === "finalist");
-
-    const winnerPred = winnerCat ? predictions.find((p) => p.categoryId === winnerCat.id) : undefined;
-    const finalistPred = finalistCat ? predictions.find((p) => p.categoryId === finalistCat.id) : undefined;
-
-    if (
-      winnerPred?.selectedTeamId &&
-      finalistPred?.selectedTeamId &&
-      winnerPred.selectedTeamId === finalistPred.selectedTeamId
-    ) {
-      return {
-        success: false,
-        error: "Ta sama drużyna nie może być jednocześnie wybrana jako Zwycięzca i Finalista.",
-      };
-    }
-
     for (const pred of predictions) {
       const cat = catMap.get(pred.categoryId);
       if (!cat) continue;
@@ -347,7 +331,103 @@ export async function adminUpdateSpecialDeadlineAction(
 }
 
 /**
- * Server Action: Admin settles special category (with multiple winners support & atomic recalculation)
+ * Server Action: Fetches comprehensive special predictions settlement report for Admin
+ */
+export async function adminGetSpecialSettlementReportAction(): Promise<{
+  success: boolean;
+  report?: SpecialPredictionsSettlementReport;
+  error?: string;
+}> {
+  try {
+    await requireAdminRole();
+    const report = await evaluateSpecialPredictionsSettlement();
+    return { success: true, report };
+  } catch (err: any) {
+    console.error("Error generating settlement report:", err);
+    return { success: false, error: err?.message || "Brak uprawnień lub błąd generowania podglądu." };
+  }
+}
+
+/**
+ * Server Action: Admin confirms & settles special category with ZERO TRUST in client payload.
+ * Canonical correct answers and readiness are strictly recalculated on the backend.
+ */
+export async function adminConfirmAndSettleSpecialCategoryAction(
+  input: z.infer<typeof confirmSpecialSettlementSchema>
+): Promise<ActionResult> {
+  try {
+    const admin = await requireAdminRole();
+
+    const parsed = confirmSpecialSettlementSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message || "Niepoprawne dane." };
+    }
+
+    const { categoryId, expectedHash } = parsed.data;
+    const adminSupabase = createAdminClient();
+
+    // 1. Recalculate canonical preview server-side (Zero Trust in client)
+    const report = await evaluateSpecialPredictionsSettlement(adminSupabase);
+    const targetCat = report.categories.find((c) => c.categoryId === categoryId);
+
+    if (!targetCat) {
+      return { success: false, error: "Nie odnaleziono kategorii specjalnej." };
+    }
+
+    if (!targetCat.canSettle) {
+      return {
+        success: false,
+        error: `Kategoria nie jest gotowa do rozliczenia: ${targetCat.readinessReason}`,
+      };
+    }
+
+    if (expectedHash && expectedHash !== targetCat.previewHash) {
+      return {
+        success: false,
+        error: "Stan danych uległ zmianie od czasu wygenerowania podglądu. Odśwież stronę i zatwierdź ponownie.",
+      };
+    }
+
+    if (targetCat.targetType === "team" && targetCat.proposedTeamIds.length === 0) {
+      return { success: false, error: "Brak wyłonionych zwycięskich drużyn." };
+    }
+
+    if (targetCat.targetType === "player" && targetCat.proposedPlayerIds.length === 0) {
+      return { success: false, error: "Brak wyłonionych zwycięskich zawodników." };
+    }
+
+    // 2. Execute atomic settlement + scoring + audit log in ONE database transaction
+    const { data: rpcResult, error: rpcError } = await adminSupabase.rpc("settle_special_prediction_category", {
+      p_category_id: categoryId,
+      p_admin_id: admin.id,
+      p_correct_team_ids: targetCat.proposedTeamIds,
+      p_correct_player_ids: targetCat.proposedPlayerIds,
+      p_details: {
+        previewHash: targetCat.previewHash,
+        readinessReason: targetCat.readinessReason,
+      },
+    });
+
+    if (rpcError) {
+      console.error("RPC settle_special_prediction_category error:", rpcError);
+      throw rpcError;
+    }
+
+    console.log(`[Special Settlement] Successfully settled category ${targetCat.categorySlug}:`, rpcResult);
+
+    revalidatePath("/admin");
+    revalidatePath("/typy-specjalne");
+    revalidatePath("/ranking");
+    revalidatePath("/");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Error executing special settlement:", err);
+    return { success: false, error: err?.message || "Wystąpił błąd podczas rozliczania kategorii specjalnej." };
+  }
+}
+
+/**
+ * Server Action: Legacy/Manual Admin settles special category (with validation & atomic recalculation)
  */
 export async function adminSettleSpecialCategoryAction(
   input: z.infer<typeof settleSpecialCategorySchema>
@@ -377,32 +457,19 @@ export async function adminSettleSpecialCategoryAction(
       return { success: false, error: "Wskaż przynajmniej jednego zwycięskiego zawodnika." };
     }
 
-    const isCorrection = category.status === "settled";
-
-    // Call PostgreSQL atomic settlement procedure
+    // Call PostgreSQL atomic settlement procedure with single-transaction audit
     const { error: rpcError } = await adminSupabase.rpc("settle_special_prediction_category", {
       p_category_id: categoryId,
+      p_admin_id: admin.id,
       p_correct_team_ids: correctTeamIds,
       p_correct_player_ids: correctPlayerIds,
+      p_details: { mode: "manual_override" },
     });
 
     if (rpcError) {
       console.error("RPC settle_special_prediction_category error:", rpcError);
       throw rpcError;
     }
-
-    await adminSupabase.from("audit_logs").insert({
-      actor_id: admin.id,
-      action: isCorrection ? "SPECIAL_RESULT_CORRECTED" : "SPECIAL_SETTLED",
-      target_type: "special_category",
-      target_id: categoryId,
-      details: {
-        categoryTitle: category.title,
-        targetType: category.target_type,
-        correctTeamIds,
-        correctPlayerIds,
-      },
-    });
 
     revalidatePath("/admin");
     revalidatePath("/typy-specjalne");
@@ -414,3 +481,4 @@ export async function adminSettleSpecialCategoryAction(
     return { success: false, error: "Wystąpił błąd podczas rozliczania kategorii specjalnej." };
   }
 }
+

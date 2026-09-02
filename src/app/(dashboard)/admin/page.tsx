@@ -28,6 +28,12 @@ import {
   Download,
   UserPlus,
   Sparkles,
+  Globe,
+  RefreshCw,
+  Unlink,
+  Link2,
+  Check,
+  X,
 } from "lucide-react";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,6 +61,7 @@ import {
   adminUpdateSpecialDeadlineAction,
   adminSettleSpecialCategoryAction,
 } from "@/lib/specials/actions";
+import { AdminSpecialsSettlement } from "@/components/admin/admin-specials-settlement";
 import {
   getPickemDataAction,
   adminUpdatePickemDeadlineAction,
@@ -73,6 +80,22 @@ import {
   adminUpdatePlayerAction,
   adminTogglePlayerActiveAction,
 } from "@/lib/players/actions";
+import {
+  adminGetGoalApiSyncStatusAction,
+  adminCheckGoalApiConnectionAction,
+  adminGetGoalApiMappingPreviewAction,
+  adminTriggerManualGoalApiSyncAction,
+  adminSetMatchGoalApiMappingAction,
+  adminToggleMatchManualOverrideAction,
+  adminSyncUclScheduleAction,
+  adminCleanupSafeOrphanTeamsAction,
+  adminBootstrapFullUclScheduleAction,
+  adminSyncUclPlayersAction,
+} from "@/lib/goal-api/actions";
+import { GoalApiSyncStatus, GoalApiSyncResult, MappingPreviewItem, GoalApiPlayersSyncResult } from "@/lib/goal-api/types";
+import { UclScheduleSyncResult } from "@/lib/goal-api/import";
+import { OrphanCleanupResult } from "@/lib/goal-api/cleanup";
+import { BootstrapUclScheduleResult } from "@/lib/goal-api/bootstrap";
 import { Database, MatchStage, MatchStatus } from "@/types/database.types";
 import { MatchWithTeams, SpecialCategoryWithPrediction, AnnouncementItem } from "@/types";
 import { TeamLogo } from "@/components/team-logo";
@@ -85,7 +108,7 @@ type ConfigRow = Database["public"]["Tables"]["pickem_config"]["Row"];
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<
-    "matches" | "teams" | "players" | "users" | "specials" | "pickem" | "announcements" | "audit" | "export"
+    "matches" | "teams" | "players" | "users" | "specials" | "pickem" | "announcements" | "audit" | "export" | "goal_api"
   >("matches");
 
   // Data states
@@ -164,10 +187,37 @@ export default function AdminPage() {
   const [editAnnouncementModal, setEditAnnouncementModal] = useState<AnnouncementItem | null>(null);
   const [announcementForm, setAnnouncementForm] = useState({ title: "", content: "", isPinned: false });
 
+  // GOAL API State
+  const [goalApiStatus, setGoalApiStatus] = useState<GoalApiSyncStatus | null>(null);
+  const [goalApiLoading, setGoalApiLoading] = useState(false);
+  const [mappingPreviews, setMappingPreviews] = useState<MappingPreviewItem[]>([]);
+  const [showMappingModal, setShowMappingModal] = useState(false);
+  const [syncResultModal, setSyncResultModal] = useState<GoalApiSyncResult | null>(null);
+  const [scheduleSyncModal, setScheduleSyncModal] = useState<UclScheduleSyncResult | null>(null);
+  const [showConfirmScheduleSync, setShowConfirmScheduleSync] = useState(false);
+  const [cleanupOrphanModal, setCleanupOrphanModal] = useState<OrphanCleanupResult | null>(null);
+  const [showConfirmCleanupOrphans, setShowConfirmCleanupOrphans] = useState(false);
+  const [bootstrapUclModal, setBootstrapUclModal] = useState<BootstrapUclScheduleResult | null>(null);
+  const [showConfirmBootstrapUcl, setShowConfirmBootstrapUcl] = useState(false);
+  const [syncPlayersResultModal, setSyncPlayersResultModal] = useState<GoalApiPlayersSyncResult | null>(null);
+  const [showConfirmSyncPlayers, setShowConfirmSyncPlayers] = useState(false);
+
+  const loadGoalApiStatus = async () => {
+    setGoalApiLoading(true);
+    try {
+      const status = await adminGetGoalApiSyncStatusAction();
+      setGoalApiStatus(status);
+    } catch (err) {
+      console.error("Error loading goal api status:", err);
+    } finally {
+      setGoalApiLoading(false);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [uList, mList, tList, pList, specList, pickData, annList, logs] = await Promise.all([
+      const [uList, mList, tList, pList, specList, pickData, annList, logs, gStatus] = await Promise.all([
         adminGetUsersListAction(),
         getMatchesWithPredictionsAction(),
         getAllTeamsAction(),
@@ -176,6 +226,7 @@ export default function AdminPage() {
         getPickemDataAction(),
         getAnnouncementsAction(),
         adminGetAuditLogsAction(),
+        adminGetGoalApiSyncStatusAction(),
       ]);
 
       setUsers(uList);
@@ -186,6 +237,7 @@ export default function AdminPage() {
       setPickemConfig(pickData.config);
       setAnnouncements(annList);
       setAuditLogs(logs);
+      setGoalApiStatus(gStatus);
 
       if (tList.length >= 2 && !createMatchForm.homeTeamId) {
         setCreateMatchForm((prev) => ({
@@ -195,7 +247,8 @@ export default function AdminPage() {
         }));
       }
     } catch (err) {
-      console.error("Error loading admin data:", err);
+      console.error("Admin: Error loading data:", err);
+      setStatusMessage({ type: "error", text: "Nie udało się załadować danych administracyjnych." });
     } finally {
       setLoading(false);
     }
@@ -204,6 +257,180 @@ export default function AdminPage() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Handlers - GOAL API
+  const handleCheckGoalApiConnection = () => {
+    startTransition(async () => {
+      try {
+        const res = await adminCheckGoalApiConnectionAction();
+        if (res.success) {
+          setStatusMessage({ type: "success", text: res.message });
+          loadGoalApiStatus();
+        } else {
+          setStatusMessage({ type: "error", text: res.message });
+        }
+      } catch (err) {
+        setStatusMessage({ type: "error", text: err instanceof Error ? err.message : "Błąd połączenia." });
+      }
+    });
+  };
+
+  const handleLoadMappingPreview = () => {
+    startTransition(async () => {
+      try {
+        const res = await adminGetGoalApiMappingPreviewAction();
+        if (res.success) {
+          setMappingPreviews(res.previews);
+          setShowMappingModal(true);
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd pobierania podglądu mapowania." });
+        }
+      } catch (err) {
+        setStatusMessage({ type: "error", text: err instanceof Error ? err.message : "Błąd pobierania podglądu." });
+      }
+    });
+  };
+
+  const handleManualGoalApiSync = () => {
+    startTransition(async () => {
+      try {
+        const res = await adminTriggerManualGoalApiSyncAction();
+        setSyncResultModal(res);
+        if (res.success) {
+          setStatusMessage({
+            type: "success",
+            text: `Synchronizacja zakończona sukcesem! Zaktualizowano ${res.syncedMatchesCount} meczów (${res.reconciledEventsCount} eventów).`,
+          });
+          loadData();
+          loadGoalApiStatus();
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd podczas synchronizacji." });
+        }
+      } catch (err) {
+        setStatusMessage({ type: "error", text: err instanceof Error ? err.message : "Błąd synchronizacji." });
+      }
+    });
+  };
+
+  const handleSyncUclSchedule = () => {
+    setShowConfirmScheduleSync(false);
+    startTransition(async () => {
+      try {
+        const res = await adminSyncUclScheduleAction();
+        setScheduleSyncModal(res);
+        if (res.success) {
+          setStatusMessage({
+            type: "success",
+            text: `Pomyślnie zsynchronizowano terminarz UCL 2026/27! Dodano ${res.newTeamsCount} drużyn (${res.updatedTeamsCount} zaktualizowano), dodano ${res.newMatchesCount} meczów (${res.updatedMatchesCount} zaktualizowano).`,
+          });
+          loadData();
+          loadGoalApiStatus();
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd podczas synchronizacji terminarza." });
+        }
+      } catch (err) {
+        setStatusMessage({ type: "error", text: err instanceof Error ? err.message : "Błąd synchronizacji terminarza." });
+      }
+    });
+  };
+
+  const handleCleanupOrphans = () => {
+    setShowConfirmCleanupOrphans(false);
+    startTransition(async () => {
+      try {
+        const res = await adminCleanupSafeOrphanTeamsAction();
+        setCleanupOrphanModal(res);
+        if (res.success) {
+          setStatusMessage({
+            type: "success",
+            text: `Pomyślnie usunięto ${res.deletedCount} zbędnych klubów seedowych (${res.skippedCount} pominięto).`,
+          });
+          loadData();
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd podczas usuwania klubów seedowych." });
+        }
+      } catch (err) {
+        setStatusMessage({ type: "error", text: err instanceof Error ? err.message : "Błąd usuwania klubów." });
+      }
+    });
+  };
+
+  const handleBootstrapUclSchedule = () => {
+    setShowConfirmBootstrapUcl(false);
+    startTransition(async () => {
+      try {
+        const res = await adminBootstrapFullUclScheduleAction();
+        setBootstrapUclModal(res);
+        if (res.success) {
+          setStatusMessage({
+            type: "success",
+            text: `Pomyślnie wdrożono pełny terminarz UEFA! (${res.newMatchesInsertedCount} nowych meczów, ${res.existingReusedCount} zachowanych).`,
+          });
+          loadData();
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd podczas wdrażania terminarza UEFA." });
+        }
+      } catch (err) {
+        setStatusMessage({ type: "error", text: err instanceof Error ? err.message : "Błąd wdrażania terminarza UEFA." });
+      }
+    });
+  };
+
+  const handleSyncUclPlayers = () => {
+    setShowConfirmSyncPlayers(false);
+    startTransition(async () => {
+      try {
+        const res = await adminSyncUclPlayersAction();
+        setSyncPlayersResultModal(res);
+        if (res.success) {
+          setStatusMessage({
+            type: "success",
+            text: `Pomyślnie zsynchronizowano składy UCL! (${res.insertedCount} dodano, ${res.updatedCount} zaktualizowano, ${res.deactivatedCount} wyłączono).`,
+          });
+          loadData();
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd podczas synchronizacji składów UCL." });
+        }
+      } catch (err) {
+        setStatusMessage({ type: "error", text: err instanceof Error ? err.message : "Błąd synchronizacji składów." });
+      }
+    });
+  };
+
+  const handleToggleManualOverride = (matchId: string, current: boolean) => {
+    startTransition(async () => {
+      try {
+        const res = await adminToggleMatchManualOverrideAction(matchId, !current);
+        if (res.success) {
+          setStatusMessage({
+            type: "success",
+            text: !current ? "Włączono blokadę ręczną dla meczu (manual override)." : "Przywrócono automatyczną synchronizację meczu.",
+          });
+          loadData();
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd zmiany trybu." });
+        }
+      } catch (err) {
+        setStatusMessage({ type: "error", text: err instanceof Error ? err.message : "Błąd zmiany trybu." });
+      }
+    });
+  };
+
+  const handleSetMatchMapping = (matchId: string, fixtureId: string | null) => {
+    startTransition(async () => {
+      try {
+        const res = await adminSetMatchGoalApiMappingAction(matchId, fixtureId);
+        if (res.success) {
+          setStatusMessage({ type: "success", text: fixtureId ? "Zmapowano mecz z GOAL API." : "Usunięto mapowanie meczu." });
+          loadData();
+        } else {
+          setStatusMessage({ type: "error", text: res.error || "Błąd zapisu mapowania." });
+        }
+      } catch (err) {
+        setStatusMessage({ type: "error", text: err instanceof Error ? err.message : "Błąd zapisu mapowania." });
+      }
+    });
+  };
 
   // Handlers - Users
   const handleCreateUser = (e: React.FormEvent) => {
@@ -559,45 +786,130 @@ export default function AdminPage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-6xl mx-auto">
-      {/* Header & Tab Navigation */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
-            <Shield className="w-3.5 h-3.5" />
-            Centrum Zarządzania
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Panel Administratora TyperLM26
-          </h1>
+      {/* Header */}
+      <div className="flex flex-col gap-1">
+        <div className="inline-flex items-center gap-2 text-xs font-semibold text-blue-400 uppercase tracking-wider">
+          <Shield className="w-3.5 h-3.5" />
+          Centrum Zarządzania
         </div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+          Panel Administratora TyperLM26
+        </h1>
+      </div>
 
-        {/* 9 Section Navigation */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 max-w-full">
-          <Button size="sm" variant={activeTab === "matches" ? "default" : "outline"} onClick={() => setActiveTab("matches")} className="text-xs">
-            <Calendar className="w-3.5 h-3.5 mr-1" /> Mecze ({matches.length})
-          </Button>
-          <Button size="sm" variant={activeTab === "players" ? "default" : "outline"} onClick={() => setActiveTab("players")} className="text-xs">
-            <UserPlus className="w-3.5 h-3.5 mr-1" /> Zawodnicy ({players.length})
-          </Button>
-          <Button size="sm" variant={activeTab === "specials" ? "default" : "outline"} onClick={() => setActiveTab("specials")} className="text-xs">
-            <Star className="w-3.5 h-3.5 mr-1" /> Typy Specjalne
-          </Button>
-          <Button size="sm" variant={activeTab === "pickem" ? "default" : "outline"} onClick={() => setActiveTab("pickem")} className="text-xs">
-            <Trophy className="w-3.5 h-3.5 mr-1" /> Pick&apos;em
-          </Button>
-          <Button size="sm" variant={activeTab === "announcements" ? "default" : "outline"} onClick={() => setActiveTab("announcements")} className="text-xs">
-            <Bell className="w-3.5 h-3.5 mr-1" /> Ogłoszenia ({announcements.length})
-          </Button>
-          <Button size="sm" variant={activeTab === "users" ? "default" : "outline"} onClick={() => setActiveTab("users")} className="text-xs">
-            <Users className="w-3.5 h-3.5 mr-1" /> Użytkownicy ({users.length})
-          </Button>
-          <Button size="sm" variant={activeTab === "audit" ? "default" : "outline"} onClick={() => setActiveTab("audit")} className="text-xs">
-            <Activity className="w-3.5 h-3.5 mr-1" /> Audit Log
-          </Button>
-          <Button size="sm" variant={activeTab === "export" ? "default" : "outline"} onClick={() => setActiveTab("export")} className="text-xs">
-            <FileText className="w-3.5 h-3.5 mr-1" /> Backup / Export
-          </Button>
-        </div>
+      {/* Responsive Navigation Tabs (flex-wrap, clean layout, no horizontal scroll) */}
+      <div className="flex flex-wrap items-center gap-2 p-2 rounded-2xl bg-[#0c1527] border border-[#182645]/80 shadow-md">
+        <Button
+          size="sm"
+          variant={activeTab === "matches" ? "default" : "outline"}
+          onClick={() => setActiveTab("matches")}
+          className={`text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "matches"
+              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20 border-blue-500/40"
+              : "border-[#182645] bg-[#101d36]/60 text-slate-300 hover:text-white hover:bg-[#101d36]"
+          }`}
+        >
+          <Calendar className="w-3.5 h-3.5 mr-1.5" /> Mecze ({matches.length})
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "players" ? "default" : "outline"}
+          onClick={() => setActiveTab("players")}
+          className={`text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "players"
+              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20 border-blue-500/40"
+              : "border-[#182645] bg-[#101d36]/60 text-slate-300 hover:text-white hover:bg-[#101d36]"
+          }`}
+        >
+          <UserPlus className="w-3.5 h-3.5 mr-1.5" /> Zawodnicy ({players.length})
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "specials" ? "default" : "outline"}
+          onClick={() => setActiveTab("specials")}
+          className={`text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "specials"
+              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20 border-blue-500/40"
+              : "border-[#182645] bg-[#101d36]/60 text-slate-300 hover:text-white hover:bg-[#101d36]"
+          }`}
+        >
+          <Star className="w-3.5 h-3.5 mr-1.5" /> Typy Specjalne
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "pickem" ? "default" : "outline"}
+          onClick={() => setActiveTab("pickem")}
+          className={`text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "pickem"
+              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20 border-blue-500/40"
+              : "border-[#182645] bg-[#101d36]/60 text-slate-300 hover:text-white hover:bg-[#101d36]"
+          }`}
+        >
+          <Trophy className="w-3.5 h-3.5 mr-1.5" /> Pick&apos;em
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "announcements" ? "default" : "outline"}
+          onClick={() => setActiveTab("announcements")}
+          className={`text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "announcements"
+              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20 border-blue-500/40"
+              : "border-[#182645] bg-[#101d36]/60 text-slate-300 hover:text-white hover:bg-[#101d36]"
+          }`}
+        >
+          <Bell className="w-3.5 h-3.5 mr-1.5" /> Ogłoszenia ({announcements.length})
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "users" ? "default" : "outline"}
+          onClick={() => setActiveTab("users")}
+          className={`text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "users"
+              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20 border-blue-500/40"
+              : "border-[#182645] bg-[#101d36]/60 text-slate-300 hover:text-white hover:bg-[#101d36]"
+          }`}
+        >
+          <Users className="w-3.5 h-3.5 mr-1.5" /> Użytkownicy ({users.length})
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "audit" ? "default" : "outline"}
+          onClick={() => setActiveTab("audit")}
+          className={`text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "audit"
+              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20 border-blue-500/40"
+              : "border-[#182645] bg-[#101d36]/60 text-slate-300 hover:text-white hover:bg-[#101d36]"
+          }`}
+        >
+          <Activity className="w-3.5 h-3.5 mr-1.5" /> Audit Log
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "export" ? "default" : "outline"}
+          onClick={() => setActiveTab("export")}
+          className={`text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "export"
+              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20 border-blue-500/40"
+              : "border-[#182645] bg-[#101d36]/60 text-slate-300 hover:text-white hover:bg-[#101d36]"
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5 mr-1.5" /> Backup / Export
+        </Button>
+        <Button
+          size="sm"
+          variant={activeTab === "goal_api" ? "default" : "outline"}
+          onClick={() => {
+            setActiveTab("goal_api");
+            loadGoalApiStatus();
+          }}
+          className={`text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "goal_api"
+              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20 border-blue-500/40"
+              : "border-[#182645] bg-[#101d36]/60 text-slate-300 hover:text-white hover:bg-[#101d36]"
+          }`}
+        >
+          <Globe className="w-3.5 h-3.5 mr-1.5" /> GOAL API
+        </Button>
       </div>
 
       {/* Global Status Banner */}
@@ -666,7 +978,7 @@ export default function AdminPage() {
                     </td>
                     <td className="py-3 px-4 text-center">
                       {m.status === "live" ? (
-                        <Badge variant="destructive" className="animate-pulse text-[10px]">LIVE • {m.liveMinute}&apos;</Badge>
+                        <Badge variant="destructive" className="animate-pulse text-[10px]">LIVE</Badge>
                       ) : m.status === "finished" ? (
                         <Badge variant="secondary" className="text-[10px]">ZAKOŃCZONY</Badge>
                       ) : (
@@ -809,81 +1121,9 @@ export default function AdminPage() {
 
       {/* TAB: SPECIALS */}
       {activeTab === "specials" && (
-        <Card className="rounded-3xl border-slate-800 bg-slate-900 p-6 shadow-xl flex flex-col gap-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-lg font-bold text-white">Rozliczanie Typów Specjalnych</CardTitle>
-              <p className="text-xs text-slate-400">
-                Wskaż zwycięzcę (lub wielu zwycięzców w przypadku remisów) i rozlicz kategorie.
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {specialCategories.map((cat) => {
-              const isPassed = new Date(cat.deadlineAt).getTime() <= Date.now() || cat.isLocked;
-
-              return (
-                <div key={cat.id} className="p-5 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between gap-4">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-bold text-white text-base">{cat.title}</span>
-                      <Badge className={cat.status === "settled" ? "bg-purple-500/20 text-purple-300" : isPassed ? "bg-amber-500/20 text-amber-300" : "bg-emerald-500/20 text-emerald-300"}>
-                        {cat.status.toUpperCase()}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-slate-400 mb-2">{cat.description}</p>
-                    <div className="text-xs text-slate-500 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Deadline: {new Date(cat.deadlineAt).toLocaleString("pl-PL")}</span>
-                    </div>
-
-                    {cat.correctAnswers && cat.correctAnswers.length > 0 && (
-                      <div className="mt-3 p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-xs">
-                        <span className="font-bold text-emerald-400 uppercase tracking-wider block mb-1">Poprawny wynik:</span>
-                        <div className="flex flex-col gap-0.5">
-                          {cat.correctAnswers.map((ans, idx) => (
-                            <span key={idx} className="font-semibold text-emerald-200">
-                              • {ans.teamName || ans.playerName}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
-                    {!isPassed && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setEditSpecialDeadlineModal(cat);
-                          setSpecialDeadlineInput(new Date(cat.deadlineAt).toISOString().slice(0, 16));
-                        }}
-                        className="text-xs text-slate-300"
-                      >
-                        Zmień deadline
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setSettleSpecialModal(cat);
-                        setSelectedWinningTeamIds(cat.correctAnswers?.map((a) => a.teamId!).filter(Boolean) || []);
-                        setSelectedWinningPlayerIds(cat.correctAnswers?.map((a) => a.playerId!).filter(Boolean) || []);
-                      }}
-                      className="bg-purple-600 hover:bg-purple-500 text-xs font-bold"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 mr-1" />
-                      {cat.status === "settled" ? "Popraw rozliczenie" : "Rozlicz kategorię"}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+        <div className="space-y-6">
+          <AdminSpecialsSettlement />
+        </div>
       )}
 
       {/* TAB: PICK'EM */}
@@ -1205,6 +1445,723 @@ export default function AdminPage() {
             </div>
           </div>
         </Card>
+      )}
+
+      {/* TAB: GOAL API */}
+      {activeTab === "goal_api" && (
+        <Card className="rounded-3xl border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-xl flex flex-col gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-xl font-bold text-white flex items-center gap-2">
+                <Globe className="w-5 h-5 text-blue-400" />
+                <span>GOAL API — Zarządzanie i Synchronizacja Live</span>
+              </CardTitle>
+              <p className="text-xs text-slate-400 mt-1">
+                Centralna integracja server-side z GOAL API dla Ligi Mistrzów 2026/2027.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCheckGoalApiConnection}
+                disabled={isPending}
+                className="text-xs"
+              >
+                <Activity className="w-3.5 h-3.5 mr-1.5 text-blue-400" />
+                Sprawdź połączenie
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleLoadMappingPreview}
+                disabled={isPending}
+                className="text-xs"
+              >
+                <Link2 className="w-3.5 h-3.5 mr-1.5 text-purple-400" />
+                Podgląd mapowania
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={() => setShowConfirmScheduleSync(true)}
+                disabled={isPending}
+                className="bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white"
+              >
+                {isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Synchronizuj kluby i MD1 (GOAL API)
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={() => setShowConfirmBootstrapUcl(true)}
+                disabled={isPending}
+                className="bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white"
+              >
+                {isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Wdróż pełny terminarz UEFA (144 mecze)
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={() => setShowConfirmSyncPlayers(true)}
+                disabled={isPending}
+                className="bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white"
+              >
+                {isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <Users className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Synchronizuj składy UCL
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowConfirmCleanupOrphans(true)}
+                disabled={isPending}
+                className="text-xs border-slate-700 text-slate-300 hover:bg-red-950/30 hover:border-red-500/50 hover:text-red-400"
+              >
+                <Trash2 className="w-3.5 h-3.5 mr-1.5 text-red-400" />
+                Wyczyść 16 orphanów
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={handleManualGoalApiSync}
+                disabled={isPending}
+                className="bg-blue-600 hover:bg-blue-500 text-xs font-semibold"
+              >
+                {isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Synchronizuj teraz (Live)
+              </Button>
+            </div>
+          </div>
+
+          {/* Status & Quota Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
+              <div className="text-[11px] text-slate-400 uppercase font-semibold">Stan konfiguracji</div>
+              <div className="mt-1 flex items-center gap-2">
+                {goalApiStatus?.isConfigured ? (
+                  <Badge className="bg-emerald-600/30 border-emerald-500/50 text-emerald-300">
+                    <CheckCircle className="w-3 h-3 mr-1" /> Skonfigurowano
+                  </Badge>
+                ) : (
+                  <Badge className="bg-red-600/30 border-red-500/50 text-red-300">
+                    <AlertCircle className="w-3 h-3 mr-1" /> Brak w .env.local
+                  </Badge>
+                )}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-2">GOAL_API_KEY (Server-side)</div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
+              <div className="text-[11px] text-slate-400 uppercase font-semibold">Limit zapytań (Quota)</div>
+              <div className="text-xl font-extrabold text-white mt-1">
+                {goalApiStatus?.quotaRemaining !== null && goalApiStatus?.quotaRemaining !== undefined
+                  ? `${goalApiStatus.quotaRemaining} / ${goalApiStatus.quotaLimit ?? 1000}`
+                  : "1000 / 1000"}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-1">Reset: Codziennie o północy UTC</div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
+              <div className="text-[11px] text-slate-400 uppercase font-semibold">Ostatni udany sync</div>
+              <div className="text-xs font-semibold text-white mt-1 truncate">
+                {goalApiStatus?.lastSuccessAt
+                  ? new Date(goalApiStatus.lastSuccessAt).toLocaleString("pl-PL")
+                  : "Brak"}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-1">
+                Lease lock: <span className="font-mono text-slate-300">{goalApiStatus?.leaseStatus || "idle"}</span>
+              </div>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
+              <div className="text-[11px] text-slate-400 uppercase font-semibold">Ostatni błąd</div>
+              <div className="text-xs text-red-400 mt-1 truncate" title={goalApiStatus?.lastError || "Brak błędów"}>
+                {goalApiStatus?.lastError || "Brak błędów"}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-1">Status HTTP / API Error</div>
+            </div>
+          </div>
+
+          {/* Mappings Table */}
+          <div className="flex flex-col gap-3">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-blue-400" />
+              <span>Mecze w TyperLM26 i status powiązania z GOAL API ({matches.length})</span>
+            </h3>
+
+            <div className="overflow-x-auto rounded-2xl border border-slate-800">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-950 font-semibold text-slate-400 border-b border-slate-800">
+                  <tr>
+                    <th className="py-3 px-4">Mecz</th>
+                    <th className="py-3 px-4">Kickoff (UTC)</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">GOAL API Fixture ID</th>
+                    <th className="py-3 px-4">Blokada ręczna (Override)</th>
+                    <th className="py-3 px-4 text-right">Akcja</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {matches.map((m) => {
+                    const isManual = (m as any).is_manual_override;
+                    const fixtureId = (m as any).goal_api_fixture_id;
+
+                    return (
+                      <tr key={m.id} className="hover:bg-slate-800/40">
+                        <td className="py-3 px-4 font-semibold text-white">
+                          <div className="flex items-center gap-2">
+                            <span>{m.homeTeam.name}</span>
+                            <span className="text-slate-500 font-mono">vs</span>
+                            <span>{m.awayTeam.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-slate-400">
+                          {new Date(m.kickoffAt).toLocaleString("pl-PL")}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge
+                            variant="secondary"
+                            className={
+                              m.status === "live"
+                                ? "bg-red-950 text-red-400 border-red-800"
+                                : m.status === "finished"
+                                ? "bg-emerald-950 text-emerald-400 border-emerald-800"
+                                : ""
+                            }
+                          >
+                            {m.status.toUpperCase()}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4 font-mono text-[11px]">
+                          {fixtureId ? (
+                            <span className="text-blue-300 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-800/50">
+                              {fixtureId}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600">Niezmapowany</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleManualOverride(m.id, isManual)}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer ${
+                              isManual
+                                ? "bg-amber-950/80 text-amber-300 border border-amber-800/50 hover:bg-amber-900/80"
+                                : "bg-slate-950 text-slate-400 border border-slate-800 hover:bg-slate-800"
+                            }`}
+                          >
+                            {isManual ? (
+                              <>
+                                <Shield className="w-3 h-3 text-amber-400" />
+                                Ręczny override aktywny
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="w-3 h-3 text-blue-400" />
+                                Auto-sync włączony
+                              </>
+                            )}
+                          </button>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {fixtureId ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleSetMatchMapping(m.id, null)}
+                              className="text-[10px] h-7 text-red-400 border-red-900 hover:bg-red-950/50"
+                            >
+                              <Unlink className="w-3 h-3 mr-1" /> Odmapuj
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleLoadMappingPreview}
+                              className="text-[10px] h-7 text-blue-300 border-blue-900 hover:bg-blue-950/50"
+                            >
+                              <Link2 className="w-3 h-3 mr-1" /> Zmapuj
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* MODAL: MAPPING PREVIEW */}
+      {showMappingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-4xl bg-slate-900 border-slate-800 p-6 rounded-3xl shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between mb-4">
+              <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+                <Link2 className="w-5 h-5 text-purple-400" />
+                <span>Podgląd Mapowania GOAL API vs TyperLM26</span>
+              </CardTitle>
+              <Button size="sm" variant="outline" onClick={() => setShowMappingModal(false)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            <p className="text-xs text-slate-400 mb-4">
+              Poniżej znajduje się bezpieczny podgląd dopasowania terminarza Ligi Mistrzów 2026/27. Mapowanie nie nadpisuje automatycznie bazy danych bez Twojej akceptacji.
+            </p>
+
+            <div className="overflow-y-auto flex-1 rounded-2xl border border-slate-800">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-950 font-semibold text-slate-400 border-b border-slate-800 sticky top-0">
+                  <tr>
+                    <th className="py-2.5 px-3">GOAL API Mecz</th>
+                    <th className="py-2.5 px-3">Kickoff</th>
+                    <th className="py-2.5 px-3">Sugerowany mecz w TyperLM26</th>
+                    <th className="py-2.5 px-3">Pewność</th>
+                    <th className="py-2.5 px-3 text-right">Akcja</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {mappingPreviews.map((p) => (
+                    <tr key={p.goalApiFixtureId} className="hover:bg-slate-800/40">
+                      <td className="py-2.5 px-3 font-semibold text-white">
+                        {p.goalApiHomeTeam} vs {p.goalApiAwayTeam}
+                        <div className="text-[10px] text-slate-500 font-mono">{p.goalApiFixtureId}</div>
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-400">
+                        {new Date(p.kickoffUtc).toLocaleString("pl-PL")}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-300">
+                        {p.suggestedMatchId ? (
+                          <div>
+                            <span className="font-semibold text-white">
+                              {p.suggestedHomeTeam} vs {p.suggestedAwayTeam}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-600">Brak jednoznacznego dopasowania</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <Badge
+                          variant="secondary"
+                          className={
+                            p.confidence === "exact"
+                              ? "bg-emerald-950 text-emerald-300 border-emerald-800"
+                              : p.confidence === "high"
+                              ? "bg-blue-950 text-blue-300 border-blue-800"
+                              : p.confidence === "low"
+                              ? "bg-amber-950 text-amber-300 border-amber-800"
+                              : "bg-slate-950 text-slate-500"
+                          }
+                        >
+                          {p.confidence.toUpperCase()}
+                        </Badge>
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        {p.suggestedMatchId && !p.isMapped && (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              handleSetMatchMapping(p.suggestedMatchId!, p.goalApiFixtureId);
+                              setShowMappingModal(false);
+                            }}
+                            className="text-[10px] h-7 bg-purple-600 hover:bg-purple-500"
+                          >
+                            Zatwierdź mapowanie
+                          </Button>
+                        )}
+                        {p.isMapped && (
+                          <Badge className="bg-emerald-950 text-emerald-400 border-emerald-800">
+                            Zmapowano
+                          </Badge>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* MODAL: SYNC RESULT REPORT */}
+      {syncResultModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-lg bg-slate-900 border-blue-500/40 p-6 rounded-3xl shadow-2xl flex flex-col gap-4">
+            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+              {syncResultModal.success ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-red-400" />
+              )}
+              <span>Raport Synchronizacji GOAL API</span>
+            </CardTitle>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block">Zaktualizowane mecze (LIVE)</span>
+                <span className="text-lg font-bold text-white">{syncResultModal.syncedMatchesCount}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block">Sfinalizowane mecze (FT)</span>
+                <span className="text-lg font-bold text-emerald-400">{syncResultModal.finalizedMatchesCount}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block">Zsynchronizowane zdarzenia</span>
+                <span className="text-lg font-bold text-purple-400">{syncResultModal.reconciledEventsCount}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block">Pominięte (Manual Override)</span>
+                <span className="text-lg font-bold text-amber-400">{syncResultModal.skippedManualOverridesCount}</span>
+              </div>
+            </div>
+
+            {syncResultModal.error && (
+              <div className="p-3 rounded-xl bg-red-950/60 border border-red-800 text-xs text-red-300">
+                {syncResultModal.error}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button size="sm" onClick={() => setSyncResultModal(null)} className="bg-blue-600 hover:bg-blue-500">
+                Zamknij raport
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* MODAL: CONFIRM SCHEDULE SYNC */}
+      {showConfirmScheduleSync && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-md bg-slate-900 border-purple-500/40 p-6 rounded-3xl shadow-2xl flex flex-col gap-4">
+            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-purple-400" />
+              <span>Synchronizacja Terminarza UCL 2026/27</span>
+            </CardTitle>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Czy na pewno chcesz zsynchronizować oficjalny terminarz UEFA Champions League 2026/27 z GOAL API?
+            </p>
+
+            <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 text-[11px] text-slate-400 space-y-1.5">
+              <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Bezpieczeństwo typów:</span>
+              </div>
+              <p>
+                Operacja jest w 100% idempotentna. Istniejące typy, punkty i historia użytkowników pozostaną nienaruszone.
+              </p>
+              <div className="flex items-center gap-1.5 text-blue-400 font-semibold pt-1">
+                <Globe className="w-3.5 h-3.5" />
+                <span>Zakres:</span>
+              </div>
+              <p>
+                36 drużyn fazy ligowej oraz 18 meczów 1. kolejki (8–10 września 2026). Kwalifikacje zostaną pominięte.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowConfirmScheduleSync(false)}
+                disabled={isPending}
+                className="text-xs"
+              >
+                Anuluj
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSyncUclSchedule}
+                disabled={isPending}
+                className="bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white"
+              >
+                {isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Calendar className="w-3.5 h-3.5 mr-1.5" />}
+                Tak, synchronizuj terminarz
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* MODAL: SCHEDULE SYNC RESULT REPORT */}
+      {scheduleSyncModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-lg bg-slate-900 border-purple-500/40 p-6 rounded-3xl shadow-2xl flex flex-col gap-4">
+            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+              {scheduleSyncModal.success ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-red-400" />
+              )}
+              <span>Raport Synchronizacji Terminarza UCL 2026/27</span>
+            </CardTitle>
+
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Drużyny Fazy Ligowej</span>
+                <span className="text-lg font-bold text-white">{scheduleSyncModal.teamsSyncedCount}</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">
+                  ({scheduleSyncModal.newTeamsCount} nowych, {scheduleSyncModal.updatedTeamsCount} zaktualizowanych)
+                </span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Mecze Fazy Ligowej</span>
+                <span className="text-lg font-bold text-purple-400">{scheduleSyncModal.matchesSyncedCount}</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">
+                  ({scheduleSyncModal.newMatchesCount} nowych, {scheduleSyncModal.updatedMatchesCount} zaktualizowanych)
+                </span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Kwalifikacje pominięte</span>
+                <span className="text-lg font-bold text-slate-400">{scheduleSyncModal.qualifyingIgnoredCount}</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">Ignorowane zgodnie z regułami</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Pominięte (Manual Override)</span>
+                <span className="text-lg font-bold text-amber-400">{scheduleSyncModal.manualOverridesSkippedCount}</span>
+                <span className="text-[10px] text-slate-500 block mt-0.5">Mecze chronione blokadą ręczną</span>
+              </div>
+            </div>
+
+            {scheduleSyncModal.error && (
+              <div className="p-3 rounded-xl bg-red-950/60 border border-red-800 text-xs text-red-300">
+                {scheduleSyncModal.error}
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button size="sm" onClick={() => setScheduleSyncModal(null)} className="bg-purple-600 hover:bg-purple-500 text-white">
+                Zamknij raport
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* MODAL: CONFIRM CLEANUP 16 ORPHANS */}
+      {showConfirmCleanupOrphans && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-md bg-slate-900 border-red-500/40 p-6 rounded-3xl shadow-2xl flex flex-col gap-4">
+            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-400" />
+              <span>Usunięcie 16 zbędnych klubów seedowych</span>
+            </CardTitle>
+            <p className="text-xs text-slate-300">
+              Ta operacja bezpiecznie usunie 16 klubów z pierwotnego seeda, które nie biorą udziału w Lidze Mistrzów 2026/27 i posiadają 0 powiązań FK w bazie.
+            </p>
+            <p className="text-[11px] text-slate-400">
+              Klub Juventus FC (posiadający wybór w Pick&apos;em) nie zostanie usunięty. Bezpośrednio przed usunięciem każdego rekordu nastąpi weryfikacja FK w czasie rzeczywistym.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <Button size="sm" variant="outline" onClick={() => setShowConfirmCleanupOrphans(false)} disabled={isPending} className="text-xs">
+                Anuluj
+              </Button>
+              <Button size="sm" onClick={handleCleanupOrphans} disabled={isPending} className="bg-red-600 hover:bg-red-500 text-xs font-semibold text-white">
+                {isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5 mr-1.5" />}
+                Tak, usuń 16 klubów
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* MODAL: CLEANUP ORPHANS RESULT */}
+      {cleanupOrphanModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-md bg-slate-900 border-slate-800 p-6 rounded-3xl shadow-2xl flex flex-col gap-4">
+            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <span>Raport Czyszczenia Klubów Seedowych</span>
+            </CardTitle>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Usunięte rekordy</span>
+                <span className="text-lg font-bold text-emerald-400">{cleanupOrphanModal.deletedCount}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Pominięte rekordy</span>
+                <span className="text-lg font-bold text-slate-400">{cleanupOrphanModal.skippedCount}</span>
+              </div>
+            </div>
+            {cleanupOrphanModal.deletedTeamNames.length > 0 && (
+              <div className="text-[11px] text-slate-400 max-h-32 overflow-y-auto bg-slate-950 p-2 rounded-xl border border-slate-800">
+                <span className="text-slate-300 font-semibold block mb-1">Usunięto:</span>
+                {cleanupOrphanModal.deletedTeamNames.join(", ")}
+              </div>
+            )}
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button size="sm" onClick={() => setCleanupOrphanModal(null)} className="bg-slate-800 hover:bg-slate-700 text-white">
+                Zamknij
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* MODAL: CONFIRM BOOTSTRAP 144 UEFA FIXTURES */}
+      {showConfirmBootstrapUcl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-md bg-slate-900 border-emerald-500/40 p-6 rounded-3xl shadow-2xl flex flex-col gap-4">
+            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              <span>Wdrożenie Pełnego Terminarza UEFA (144 mecze)</span>
+            </CardTitle>
+            <p className="text-xs text-slate-300">
+              Operacja wdroży kompletny kalendarz fazy ligowej Ligi Mistrzów 2026/27 (kolejki 1–8).
+            </p>
+            <ul className="text-[11px] text-slate-400 list-disc pl-4 space-y-1">
+              <li>18 istniejących meczów 1. kolejki zostanie w 100% zachowanych (UUID, typy, statusy).</li>
+              <li>126 nowych meczów (kolejki 2–8) zostanie dodanych ze statusem zaplanowany.</li>
+              <li>GOAL API po opublikowaniu kolejnych kolejek automatycznie połączy wyniki z tymi meczami.</li>
+            </ul>
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <Button size="sm" variant="outline" onClick={() => setShowConfirmBootstrapUcl(false)} disabled={isPending} className="text-xs">
+                Anuluj
+              </Button>
+              <Button size="sm" onClick={handleBootstrapUclSchedule} disabled={isPending} className="bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white">
+                {isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />}
+                Tak, wdróż 144 mecze
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* MODAL: BOOTSTRAP RESULT */}
+      {bootstrapUclModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-lg bg-slate-900 border-emerald-500/40 p-6 rounded-3xl shadow-2xl flex flex-col gap-4">
+            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+              {bootstrapUclModal.success ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-red-400" />
+              )}
+              <span>Raport Wdrożenia Terminarza UEFA (144 mecze)</span>
+            </CardTitle>
+            <div className="grid grid-cols-3 gap-3 text-xs">
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Łącznie w kalendarzu</span>
+                <span className="text-lg font-bold text-white">{bootstrapUclModal.totalDatasetMatches}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Zachowane mecze</span>
+                <span className="text-lg font-bold text-emerald-400">{bootstrapUclModal.existingReusedCount}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Nowo dodane</span>
+                <span className="text-lg font-bold text-blue-400">{bootstrapUclModal.newMatchesInsertedCount}</span>
+              </div>
+            </div>
+            {bootstrapUclModal.error && (
+              <div className="p-3 rounded-xl bg-red-950/60 border border-red-800 text-xs text-red-300">
+                {bootstrapUclModal.error}
+              </div>
+            )}
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button size="sm" onClick={() => setBootstrapUclModal(null)} className="bg-emerald-600 hover:bg-emerald-500 text-white">
+                Zamknij raport
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* MODAL: CONFIRM SYNC PLAYERS (36 CLUBS) */}
+      {showConfirmSyncPlayers && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-md bg-slate-900 border-purple-500/40 p-6 rounded-3xl shadow-2xl flex flex-col gap-4">
+            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+              <Users className="w-5 h-5 text-purple-400" />
+              <span>Synchronizacja Składów 36 Klubów UCL</span>
+            </CardTitle>
+            <p className="text-xs text-slate-300">
+              Operacja pobierze z GOAL API oficjalne składy wszystkich 36 drużyn fazy ligowej.
+            </p>
+            <ul className="text-[11px] text-slate-400 list-disc pl-4 space-y-1">
+              <li>Zawodnicy zostaną zidentyfikowani po stabilnym external ID (CUID oraz apiId).</li>
+              <li>Stan aktywności graczy zostanie pobrany z pola <code>isActive</code> providera.</li>
+              <li>Globalna dezaktywacja nieobecnych graczy uruchomi się tylko przy 100% udanych zapytaniach (36/36).</li>
+              <li>Żadne rekordy zawodników nie zostaną usunięte z bazy.</li>
+            </ul>
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <Button size="sm" variant="outline" onClick={() => setShowConfirmSyncPlayers(false)} disabled={isPending} className="text-xs">
+                Anuluj
+              </Button>
+              <Button size="sm" onClick={handleSyncUclPlayers} disabled={isPending} className="bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white">
+                {isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Users className="w-3.5 h-3.5 mr-1.5" />}
+                Rozpocznij synchronizację (36 drużyn)
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* MODAL: PLAYERS SYNC RESULT */}
+      {syncPlayersResultModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <Card className="w-full max-w-lg bg-slate-900 border-purple-500/40 p-6 rounded-3xl shadow-2xl flex flex-col gap-4">
+            <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+              {syncPlayersResultModal.success ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+              ) : (
+                <AlertCircle className="w-5 h-5 text-red-400" />
+              )}
+              <span>Raport Synchronizacji Składów UCL</span>
+            </CardTitle>
+            <div className="grid grid-cols-3 gap-3 text-xs">
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Ukończone kluby</span>
+                <span className="text-lg font-bold text-white">{syncPlayersResultModal.successfulTeamsCount} / {syncPlayersResultModal.totalTeamsChecked}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Nowo dodani</span>
+                <span className="text-lg font-bold text-emerald-400">{syncPlayersResultModal.insertedCount}</span>
+              </div>
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <span className="text-slate-400 block font-medium">Zaktualizowani</span>
+                <span className="text-lg font-bold text-blue-400">{syncPlayersResultModal.updatedCount}</span>
+              </div>
+            </div>
+            {syncPlayersResultModal.error && (
+              <div className="p-3 rounded-xl bg-red-950/60 border border-red-800 text-xs text-red-300">
+                {syncPlayersResultModal.error}
+              </div>
+            )}
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <Button size="sm" onClick={() => setSyncPlayersResultModal(null)} className="bg-purple-600 hover:bg-purple-500 text-white">
+                Zamknij raport
+              </Button>
+            </div>
+          </Card>
+        </div>
       )}
 
       {/* MODAL: SETTLE SPECIAL PREDICTION CATEGORY (Multiple Winners Support) */}

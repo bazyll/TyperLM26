@@ -87,27 +87,6 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
 
   const handleSaveAll = async () => {
     setIsSaving(true);
-    setFeedback(null);
-
-    // Validate winner vs finalist collision on client side as well
-    const winnerCat = categories.find((c) => c.slug === "winner");
-    const finalistCat = categories.find((c) => c.slug === "finalist");
-
-    if (
-      winnerCat &&
-      finalistCat &&
-      selections[winnerCat.id]?.teamId &&
-      selections[finalistCat.id]?.teamId &&
-      selections[winnerCat.id]?.teamId === selections[finalistCat.id]?.teamId
-    ) {
-      setIsSaving(false);
-      setFeedback({
-        success: false,
-        message: "Ta sama drużyna nie może być jednocześnie wybrana jako Zwycięzca i Finalista.",
-      });
-      return;
-    }
-
     const payload = Object.entries(selections)
       .filter(([_, sel]) => sel.teamId || sel.playerId)
       .map(([catId, sel]) => ({
@@ -464,6 +443,7 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
               ) : (
                 /* Players List */
                 players
+                  .filter((p) => p.is_ucl_registered || selections[activeCategory.id]?.playerId === p.id)
                   .filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
                   .map((player) => {
                     const isSelected = selections[activeCategory.id]?.playerId === player.id;
@@ -479,9 +459,36 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
                             : "bg-slate-950/60 hover:bg-slate-800/80 text-slate-200"
                         }`}
                       >
-                        <div>
-                          <span className="text-sm block">{player.name}</span>
-                          {pTeam && <span className="text-[11px] text-slate-400 block">{pTeam.name}</span>}
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-blue-300 shrink-0">
+                            {player.name.charAt(0)}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold block">{player.name}</span>
+                              {player.jersey_number && (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
+                                  #{player.jersey_number}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {pTeam && (
+                                <div className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                                  <TeamLogo
+                                    logoUrl={pTeam.logo_url}
+                                    teamName={pTeam.name}
+                                    teamCode={pTeam.code}
+                                    size={14}
+                                  />
+                                  <span>{pTeam.name}</span>
+                                </div>
+                              )}
+                              {player.position && (
+                                <span className="text-[10px] text-slate-500">• {player.position}</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         {isSelected && <CheckCircle2 className="w-5 h-5 text-white" />}
                       </button>

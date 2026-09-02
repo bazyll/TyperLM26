@@ -3,7 +3,7 @@ export interface TableTeamData {
   name: string;
   shortName: string;
   code: string;
-  logoUrl: string;
+  logoUrl: string | null;
   uefaCoefficient: number;
   disciplinaryPoints: number;
 }

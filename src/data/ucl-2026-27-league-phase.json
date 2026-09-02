@@ -1,0 +1,1298 @@
+[
+  {
+    "id": "ucl-2026-md1-1",
+    "matchday": 1,
+    "homeTeam": "AEK Athens",
+    "awayTeam": "LASK",
+    "kickoffUtc": "2026-09-08T16:45:00.000Z",
+    "goalApiFixtureId": "cmtgj9zrf02yrnt06gipy78jp",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-2",
+    "matchday": 1,
+    "homeTeam": "Club Brugge KV",
+    "awayTeam": "Aston Villa",
+    "kickoffUtc": "2026-09-08T16:45:00.000Z",
+    "goalApiFixtureId": "cmtgj9zrh02ytnt06g7ytqycu",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-3",
+    "matchday": 1,
+    "homeTeam": "Dortmund",
+    "awayTeam": "Villarreal",
+    "kickoffUtc": "2026-09-08T19:00:00.000Z",
+    "goalApiFixtureId": "cmtgja0vu03fnnt06xe3eywxu",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-4",
+    "matchday": 1,
+    "homeTeam": "FC Porto",
+    "awayTeam": "Manchester City",
+    "kickoffUtc": "2026-09-08T19:00:00.000Z",
+    "goalApiFixtureId": "cmtgja0vz03fqnt06ico7ptg3",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-5",
+    "matchday": 1,
+    "homeTeam": "Lille",
+    "awayTeam": "Betis",
+    "kickoffUtc": "2026-09-08T19:00:00.000Z",
+    "goalApiFixtureId": "cmtgja0w303fsnt06t0fz7b66",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-6",
+    "matchday": 1,
+    "homeTeam": "Real Madrid",
+    "awayTeam": "Inter",
+    "kickoffUtc": "2026-09-08T19:00:00.000Z",
+    "goalApiFixtureId": "cmtgja0w703fwnt06xqjabdz1",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-7",
+    "matchday": 1,
+    "homeTeam": "Stuttgart",
+    "awayTeam": "Viking",
+    "kickoffUtc": "2026-09-09T16:45:00.000Z",
+    "goalApiFixtureId": "cmthypp1ne1qinx070npyjpgf",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-8",
+    "matchday": 1,
+    "homeTeam": "Barcelona",
+    "awayTeam": "Feyenoord",
+    "kickoffUtc": "2026-09-09T16:45:00.000Z",
+    "goalApiFixtureId": "cmthypp7xe1sfnx07x4yn8s81",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-9",
+    "matchday": 1,
+    "homeTeam": "Liverpool",
+    "awayTeam": "Atl. Madrid",
+    "kickoffUtc": "2026-09-09T19:00:00.000Z",
+    "goalApiFixtureId": "cmthypqsze29bnx0732ae2tab",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-10",
+    "matchday": 1,
+    "homeTeam": "Napoli",
+    "awayTeam": "Arsenal",
+    "kickoffUtc": "2026-09-09T19:00:00.000Z",
+    "goalApiFixtureId": "cmthypqt6e29dnx07ws8lw34z",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-11",
+    "matchday": 1,
+    "homeTeam": "PSG",
+    "awayTeam": "Slovan Bratislava",
+    "kickoffUtc": "2026-09-09T19:00:00.000Z",
+    "goalApiFixtureId": "cmthypqtae29hnx073xvkejdj",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-12",
+    "matchday": 1,
+    "homeTeam": "Sporting CP",
+    "awayTeam": "Galatasaray",
+    "kickoffUtc": "2026-09-09T19:00:00.000Z",
+    "goalApiFixtureId": "cmthypqtge29lnx070kq2v8ob",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-13",
+    "matchday": 1,
+    "homeTeam": "PSV",
+    "awayTeam": "Shakhtar Donetsk",
+    "kickoffUtc": "2026-09-10T16:45:00.000Z",
+    "goalApiFixtureId": "cmtje82mh2vosr807sbwh3ebt",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-14",
+    "matchday": 1,
+    "homeTeam": "Fenerbahce",
+    "awayTeam": "AS Roma",
+    "kickoffUtc": "2026-09-10T16:45:00.000Z",
+    "goalApiFixtureId": "cmtje82mi2votr807g50ecxdo",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-15",
+    "matchday": 1,
+    "homeTeam": "Manchester Utd",
+    "awayTeam": "Sabah Baku",
+    "kickoffUtc": "2026-09-10T19:00:00.000Z",
+    "goalApiFixtureId": "cmtje82y62vt1r8072j9utsfv",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-16",
+    "matchday": 1,
+    "homeTeam": "Slavia Prague",
+    "awayTeam": "Lens",
+    "kickoffUtc": "2026-09-10T19:00:00.000Z",
+    "goalApiFixtureId": "cmtje82yl2vt3r807w5nwxmhm",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-17",
+    "matchday": 1,
+    "homeTeam": "Bayern Munich",
+    "awayTeam": "Bodo/Glimt",
+    "kickoffUtc": "2026-09-10T19:00:00.000Z",
+    "goalApiFixtureId": "cmtje83082vu4r8071dujr2aj",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md1-18",
+    "matchday": 1,
+    "homeTeam": "Como",
+    "awayTeam": "RB Leipzig",
+    "kickoffUtc": "2026-09-10T19:00:00.000Z",
+    "goalApiFixtureId": "cmtje830b2vu6r807xmb63wdy",
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-1",
+    "matchday": 2,
+    "homeTeam": "AEK Athens",
+    "awayTeam": "Villarreal",
+    "kickoffUtc": "2026-09-29T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-2",
+    "matchday": 2,
+    "homeTeam": "Viking",
+    "awayTeam": "Arsenal",
+    "kickoffUtc": "2026-09-29T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-3",
+    "matchday": 2,
+    "homeTeam": "AS Roma",
+    "awayTeam": "Stuttgart",
+    "kickoffUtc": "2026-09-29T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-4",
+    "matchday": 2,
+    "homeTeam": "Aston Villa",
+    "awayTeam": "Sporting CP",
+    "kickoffUtc": "2026-09-29T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-5",
+    "matchday": 2,
+    "homeTeam": "Slovan Bratislava",
+    "awayTeam": "Atl. Madrid",
+    "kickoffUtc": "2026-09-29T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-6",
+    "matchday": 2,
+    "homeTeam": "Barcelona",
+    "awayTeam": "Slavia Prague",
+    "kickoffUtc": "2026-09-29T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-7",
+    "matchday": 2,
+    "homeTeam": "Shakhtar Donetsk",
+    "awayTeam": "Bayern Munich",
+    "kickoffUtc": "2026-09-29T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-8",
+    "matchday": 2,
+    "homeTeam": "Sabah Baku",
+    "awayTeam": "Betis",
+    "kickoffUtc": "2026-09-29T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-9",
+    "matchday": 2,
+    "homeTeam": "Bodo/Glimt",
+    "awayTeam": "Real Madrid",
+    "kickoffUtc": "2026-09-29T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-10",
+    "matchday": 2,
+    "homeTeam": "RB Leipzig",
+    "awayTeam": "Club Brugge KV",
+    "kickoffUtc": "2026-09-30T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-11",
+    "matchday": 2,
+    "homeTeam": "PSV",
+    "awayTeam": "Como",
+    "kickoffUtc": "2026-09-30T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-12",
+    "matchday": 2,
+    "homeTeam": "Dortmund",
+    "awayTeam": "PSG",
+    "kickoffUtc": "2026-09-30T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-13",
+    "matchday": 2,
+    "homeTeam": "Napoli",
+    "awayTeam": "FC Porto",
+    "kickoffUtc": "2026-09-30T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-14",
+    "matchday": 2,
+    "homeTeam": "Manchester Utd",
+    "awayTeam": "Fenerbahce",
+    "kickoffUtc": "2026-09-30T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-15",
+    "matchday": 2,
+    "homeTeam": "Feyenoord",
+    "awayTeam": "Manchester City",
+    "kickoffUtc": "2026-09-30T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-16",
+    "matchday": 2,
+    "homeTeam": "Galatasaray",
+    "awayTeam": "Liverpool",
+    "kickoffUtc": "2026-09-30T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-17",
+    "matchday": 2,
+    "homeTeam": "Inter",
+    "awayTeam": "Lille",
+    "kickoffUtc": "2026-09-30T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md2-18",
+    "matchday": 2,
+    "homeTeam": "Lens",
+    "awayTeam": "LASK",
+    "kickoffUtc": "2026-09-30T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-1",
+    "matchday": 3,
+    "homeTeam": "Viking",
+    "awayTeam": "AEK Athens",
+    "kickoffUtc": "2026-10-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-2",
+    "matchday": 3,
+    "homeTeam": "Villarreal",
+    "awayTeam": "Stuttgart",
+    "kickoffUtc": "2026-10-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-3",
+    "matchday": 3,
+    "homeTeam": "Arsenal",
+    "awayTeam": "Sporting CP",
+    "kickoffUtc": "2026-10-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-4",
+    "matchday": 3,
+    "homeTeam": "AS Roma",
+    "awayTeam": "Slovan Bratislava",
+    "kickoffUtc": "2026-10-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-5",
+    "matchday": 3,
+    "homeTeam": "Aston Villa",
+    "awayTeam": "Slavia Prague",
+    "kickoffUtc": "2026-10-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-6",
+    "matchday": 3,
+    "homeTeam": "Atl. Madrid",
+    "awayTeam": "Shakhtar Donetsk",
+    "kickoffUtc": "2026-10-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-7",
+    "matchday": 3,
+    "homeTeam": "Sabah Baku",
+    "awayTeam": "Barcelona",
+    "kickoffUtc": "2026-10-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-8",
+    "matchday": 3,
+    "homeTeam": "Real Madrid",
+    "awayTeam": "Bayern Munich",
+    "kickoffUtc": "2026-10-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-9",
+    "matchday": 3,
+    "homeTeam": "Betis",
+    "awayTeam": "RB Leipzig",
+    "kickoffUtc": "2026-10-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-10",
+    "matchday": 3,
+    "homeTeam": "Bodo/Glimt",
+    "awayTeam": "PSV",
+    "kickoffUtc": "2026-10-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-11",
+    "matchday": 3,
+    "homeTeam": "Club Brugge KV",
+    "awayTeam": "PSG",
+    "kickoffUtc": "2026-10-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-12",
+    "matchday": 3,
+    "homeTeam": "Napoli",
+    "awayTeam": "Como",
+    "kickoffUtc": "2026-10-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-13",
+    "matchday": 3,
+    "homeTeam": "Manchester Utd",
+    "awayTeam": "Dortmund",
+    "kickoffUtc": "2026-10-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-14",
+    "matchday": 3,
+    "homeTeam": "Manchester City",
+    "awayTeam": "FC Porto",
+    "kickoffUtc": "2026-10-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-15",
+    "matchday": 3,
+    "homeTeam": "Fenerbahce",
+    "awayTeam": "Liverpool",
+    "kickoffUtc": "2026-10-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-16",
+    "matchday": 3,
+    "homeTeam": "Lille",
+    "awayTeam": "Feyenoord",
+    "kickoffUtc": "2026-10-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-17",
+    "matchday": 3,
+    "homeTeam": "Galatasaray",
+    "awayTeam": "Lens",
+    "kickoffUtc": "2026-10-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md3-18",
+    "matchday": 3,
+    "homeTeam": "Inter",
+    "awayTeam": "LASK",
+    "kickoffUtc": "2026-10-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-1",
+    "matchday": 4,
+    "homeTeam": "Stuttgart",
+    "awayTeam": "AEK Athens",
+    "kickoffUtc": "2026-11-03T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-2",
+    "matchday": 4,
+    "homeTeam": "Viking",
+    "awayTeam": "Sporting CP",
+    "kickoffUtc": "2026-11-03T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-3",
+    "matchday": 4,
+    "homeTeam": "Slovan Bratislava",
+    "awayTeam": "Villarreal",
+    "kickoffUtc": "2026-11-03T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-4",
+    "matchday": 4,
+    "homeTeam": "Arsenal",
+    "awayTeam": "Slavia Prague",
+    "kickoffUtc": "2026-11-03T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-5",
+    "matchday": 4,
+    "homeTeam": "Shakhtar Donetsk",
+    "awayTeam": "AS Roma",
+    "kickoffUtc": "2026-11-03T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-6",
+    "matchday": 4,
+    "homeTeam": "Sabah Baku",
+    "awayTeam": "Aston Villa",
+    "kickoffUtc": "2026-11-03T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-7",
+    "matchday": 4,
+    "homeTeam": "Atl. Madrid",
+    "awayTeam": "Real Madrid",
+    "kickoffUtc": "2026-11-03T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-8",
+    "matchday": 4,
+    "homeTeam": "RB Leipzig",
+    "awayTeam": "Barcelona",
+    "kickoffUtc": "2026-11-03T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-9",
+    "matchday": 4,
+    "homeTeam": "PSV",
+    "awayTeam": "Bayern Munich",
+    "kickoffUtc": "2026-11-03T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-10",
+    "matchday": 4,
+    "homeTeam": "Betis",
+    "awayTeam": "PSG",
+    "kickoffUtc": "2026-11-04T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-11",
+    "matchday": 4,
+    "homeTeam": "Bodo/Glimt",
+    "awayTeam": "Napoli",
+    "kickoffUtc": "2026-11-04T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-12",
+    "matchday": 4,
+    "homeTeam": "Manchester Utd",
+    "awayTeam": "Club Brugge KV",
+    "kickoffUtc": "2026-11-04T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-13",
+    "matchday": 4,
+    "homeTeam": "Como",
+    "awayTeam": "Manchester City",
+    "kickoffUtc": "2026-11-04T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-14",
+    "matchday": 4,
+    "homeTeam": "Dortmund",
+    "awayTeam": "Liverpool",
+    "kickoffUtc": "2026-11-04T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-15",
+    "matchday": 4,
+    "homeTeam": "Lille",
+    "awayTeam": "FC Porto",
+    "kickoffUtc": "2026-11-04T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-16",
+    "matchday": 4,
+    "homeTeam": "Lens",
+    "awayTeam": "Fenerbahce",
+    "kickoffUtc": "2026-11-04T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-17",
+    "matchday": 4,
+    "homeTeam": "Feyenoord",
+    "awayTeam": "LASK",
+    "kickoffUtc": "2026-11-04T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md4-18",
+    "matchday": 4,
+    "homeTeam": "Galatasaray",
+    "awayTeam": "Inter",
+    "kickoffUtc": "2026-11-04T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-1",
+    "matchday": 5,
+    "homeTeam": "AEK Athens",
+    "awayTeam": "Sporting CP",
+    "kickoffUtc": "2026-11-24T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-2",
+    "matchday": 5,
+    "homeTeam": "Slovan Bratislava",
+    "awayTeam": "Stuttgart",
+    "kickoffUtc": "2026-11-24T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-3",
+    "matchday": 5,
+    "homeTeam": "Slavia Prague",
+    "awayTeam": "Viking",
+    "kickoffUtc": "2026-11-24T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-4",
+    "matchday": 5,
+    "homeTeam": "Villarreal",
+    "awayTeam": "Shakhtar Donetsk",
+    "kickoffUtc": "2026-11-24T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-5",
+    "matchday": 5,
+    "homeTeam": "Arsenal",
+    "awayTeam": "Sabah Baku",
+    "kickoffUtc": "2026-11-24T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-6",
+    "matchday": 5,
+    "homeTeam": "AS Roma",
+    "awayTeam": "Real Madrid",
+    "kickoffUtc": "2026-11-24T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-7",
+    "matchday": 5,
+    "homeTeam": "RB Leipzig",
+    "awayTeam": "Aston Villa",
+    "kickoffUtc": "2026-11-24T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-8",
+    "matchday": 5,
+    "homeTeam": "PSV",
+    "awayTeam": "Atl. Madrid",
+    "kickoffUtc": "2026-11-24T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-9",
+    "matchday": 5,
+    "homeTeam": "PSG",
+    "awayTeam": "Barcelona",
+    "kickoffUtc": "2026-11-24T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-10",
+    "matchday": 5,
+    "homeTeam": "Bayern Munich",
+    "awayTeam": "Napoli",
+    "kickoffUtc": "2026-11-25T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-11",
+    "matchday": 5,
+    "homeTeam": "Betis",
+    "awayTeam": "Manchester Utd",
+    "kickoffUtc": "2026-11-25T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-12",
+    "matchday": 5,
+    "homeTeam": "Manchester City",
+    "awayTeam": "Bodo/Glimt",
+    "kickoffUtc": "2026-11-25T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-13",
+    "matchday": 5,
+    "homeTeam": "Liverpool",
+    "awayTeam": "Club Brugge KV",
+    "kickoffUtc": "2026-11-25T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-14",
+    "matchday": 5,
+    "homeTeam": "Como",
+    "awayTeam": "Lille",
+    "kickoffUtc": "2026-11-25T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-15",
+    "matchday": 5,
+    "homeTeam": "Lens",
+    "awayTeam": "Dortmund",
+    "kickoffUtc": "2026-11-25T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-16",
+    "matchday": 5,
+    "homeTeam": "LASK",
+    "awayTeam": "FC Porto",
+    "kickoffUtc": "2026-11-25T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-17",
+    "matchday": 5,
+    "homeTeam": "Fenerbahce",
+    "awayTeam": "Inter",
+    "kickoffUtc": "2026-11-25T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md5-18",
+    "matchday": 5,
+    "homeTeam": "Galatasaray",
+    "awayTeam": "Feyenoord",
+    "kickoffUtc": "2026-11-25T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-1",
+    "matchday": 6,
+    "homeTeam": "AEK Athens",
+    "awayTeam": "Slovan Bratislava",
+    "kickoffUtc": "2026-12-08T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-2",
+    "matchday": 6,
+    "homeTeam": "Sporting CP",
+    "awayTeam": "Slavia Prague",
+    "kickoffUtc": "2026-12-08T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-3",
+    "matchday": 6,
+    "homeTeam": "Stuttgart",
+    "awayTeam": "Shakhtar Donetsk",
+    "kickoffUtc": "2026-12-08T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-4",
+    "matchday": 6,
+    "homeTeam": "Sabah Baku",
+    "awayTeam": "Viking",
+    "kickoffUtc": "2026-12-08T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-5",
+    "matchday": 6,
+    "homeTeam": "Real Madrid",
+    "awayTeam": "Villarreal",
+    "kickoffUtc": "2026-12-08T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-6",
+    "matchday": 6,
+    "homeTeam": "RB Leipzig",
+    "awayTeam": "Arsenal",
+    "kickoffUtc": "2026-12-08T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-7",
+    "matchday": 6,
+    "homeTeam": "AS Roma",
+    "awayTeam": "PSV",
+    "kickoffUtc": "2026-12-08T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-8",
+    "matchday": 6,
+    "homeTeam": "Aston Villa",
+    "awayTeam": "PSG",
+    "kickoffUtc": "2026-12-08T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-9",
+    "matchday": 6,
+    "homeTeam": "Atl. Madrid",
+    "awayTeam": "Napoli",
+    "kickoffUtc": "2026-12-08T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-10",
+    "matchday": 6,
+    "homeTeam": "Barcelona",
+    "awayTeam": "Manchester Utd",
+    "kickoffUtc": "2026-12-09T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-11",
+    "matchday": 6,
+    "homeTeam": "Bayern Munich",
+    "awayTeam": "Manchester City",
+    "kickoffUtc": "2026-12-09T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-12",
+    "matchday": 6,
+    "homeTeam": "Liverpool",
+    "awayTeam": "Betis",
+    "kickoffUtc": "2026-12-09T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-13",
+    "matchday": 6,
+    "homeTeam": "Lille",
+    "awayTeam": "Bodo/Glimt",
+    "kickoffUtc": "2026-12-09T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-14",
+    "matchday": 6,
+    "homeTeam": "Club Brugge KV",
+    "awayTeam": "Lens",
+    "kickoffUtc": "2026-12-09T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-15",
+    "matchday": 6,
+    "homeTeam": "LASK",
+    "awayTeam": "Como",
+    "kickoffUtc": "2026-12-09T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-16",
+    "matchday": 6,
+    "homeTeam": "Dortmund",
+    "awayTeam": "Inter",
+    "kickoffUtc": "2026-12-09T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-17",
+    "matchday": 6,
+    "homeTeam": "FC Porto",
+    "awayTeam": "Galatasaray",
+    "kickoffUtc": "2026-12-09T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md6-18",
+    "matchday": 6,
+    "homeTeam": "Feyenoord",
+    "awayTeam": "Fenerbahce",
+    "kickoffUtc": "2026-12-09T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-1",
+    "matchday": 7,
+    "homeTeam": "Slavia Prague",
+    "awayTeam": "AEK Athens",
+    "kickoffUtc": "2027-01-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-2",
+    "matchday": 7,
+    "homeTeam": "Shakhtar Donetsk",
+    "awayTeam": "Slovan Bratislava",
+    "kickoffUtc": "2027-01-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-3",
+    "matchday": 7,
+    "homeTeam": "Sporting CP",
+    "awayTeam": "Sabah Baku",
+    "kickoffUtc": "2027-01-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-4",
+    "matchday": 7,
+    "homeTeam": "Real Madrid",
+    "awayTeam": "Stuttgart",
+    "kickoffUtc": "2027-01-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-5",
+    "matchday": 7,
+    "homeTeam": "Viking",
+    "awayTeam": "RB Leipzig",
+    "kickoffUtc": "2027-01-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-6",
+    "matchday": 7,
+    "homeTeam": "Villarreal",
+    "awayTeam": "PSV",
+    "kickoffUtc": "2027-01-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-7",
+    "matchday": 7,
+    "homeTeam": "PSG",
+    "awayTeam": "Arsenal",
+    "kickoffUtc": "2027-01-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-8",
+    "matchday": 7,
+    "homeTeam": "Napoli",
+    "awayTeam": "AS Roma",
+    "kickoffUtc": "2027-01-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-9",
+    "matchday": 7,
+    "homeTeam": "Aston Villa",
+    "awayTeam": "Manchester Utd",
+    "kickoffUtc": "2027-01-20T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-10",
+    "matchday": 7,
+    "homeTeam": "Manchester City",
+    "awayTeam": "Atl. Madrid",
+    "kickoffUtc": "2027-01-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-11",
+    "matchday": 7,
+    "homeTeam": "Barcelona",
+    "awayTeam": "Liverpool",
+    "kickoffUtc": "2027-01-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-12",
+    "matchday": 7,
+    "homeTeam": "Bayern Munich",
+    "awayTeam": "Lille",
+    "kickoffUtc": "2027-01-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-13",
+    "matchday": 7,
+    "homeTeam": "Betis",
+    "awayTeam": "Lens",
+    "kickoffUtc": "2027-01-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-14",
+    "matchday": 7,
+    "homeTeam": "LASK",
+    "awayTeam": "Bodo/Glimt",
+    "kickoffUtc": "2027-01-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-15",
+    "matchday": 7,
+    "homeTeam": "Inter",
+    "awayTeam": "Club Brugge KV",
+    "kickoffUtc": "2027-01-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-16",
+    "matchday": 7,
+    "homeTeam": "Como",
+    "awayTeam": "Galatasaray",
+    "kickoffUtc": "2027-01-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-17",
+    "matchday": 7,
+    "homeTeam": "Feyenoord",
+    "awayTeam": "Dortmund",
+    "kickoffUtc": "2027-01-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md7-18",
+    "matchday": 7,
+    "homeTeam": "FC Porto",
+    "awayTeam": "Fenerbahce",
+    "kickoffUtc": "2027-01-21T19:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-1",
+    "matchday": 8,
+    "homeTeam": "Shakhtar Donetsk",
+    "awayTeam": "AEK Athens",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-2",
+    "matchday": 8,
+    "homeTeam": "Slavia Prague",
+    "awayTeam": "Sabah Baku",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-3",
+    "matchday": 8,
+    "homeTeam": "Slovan Bratislava",
+    "awayTeam": "Real Madrid",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-4",
+    "matchday": 8,
+    "homeTeam": "Sporting CP",
+    "awayTeam": "RB Leipzig",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-5",
+    "matchday": 8,
+    "homeTeam": "Stuttgart",
+    "awayTeam": "PSV",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-6",
+    "matchday": 8,
+    "homeTeam": "PSG",
+    "awayTeam": "Viking",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-7",
+    "matchday": 8,
+    "homeTeam": "Villarreal",
+    "awayTeam": "Napoli",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-8",
+    "matchday": 8,
+    "homeTeam": "Arsenal",
+    "awayTeam": "Manchester Utd",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-9",
+    "matchday": 8,
+    "homeTeam": "Manchester City",
+    "awayTeam": "AS Roma",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-10",
+    "matchday": 8,
+    "homeTeam": "Liverpool",
+    "awayTeam": "Aston Villa",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-11",
+    "matchday": 8,
+    "homeTeam": "Atl. Madrid",
+    "awayTeam": "Lille",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-12",
+    "matchday": 8,
+    "homeTeam": "Lens",
+    "awayTeam": "Barcelona",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-13",
+    "matchday": 8,
+    "homeTeam": "LASK",
+    "awayTeam": "Bayern Munich",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-14",
+    "matchday": 8,
+    "homeTeam": "Inter",
+    "awayTeam": "Betis",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-15",
+    "matchday": 8,
+    "homeTeam": "Bodo/Glimt",
+    "awayTeam": "Galatasaray",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-16",
+    "matchday": 8,
+    "homeTeam": "Club Brugge KV",
+    "awayTeam": "Feyenoord",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-17",
+    "matchday": 8,
+    "homeTeam": "Fenerbahce",
+    "awayTeam": "Como",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  },
+  {
+    "id": "ucl-2026-md8-18",
+    "matchday": 8,
+    "homeTeam": "FC Porto",
+    "awayTeam": "Dortmund",
+    "kickoffUtc": "2027-01-28T20:00:00.000Z",
+    "goalApiFixtureId": null,
+    "source": "UEFA"
+  }
+]

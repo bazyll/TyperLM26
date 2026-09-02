@@ -20,3 +20,9 @@ export const settleSpecialCategorySchema = z.object({
   correctTeamIds: z.array(z.string().uuid()).optional().default([]),
   correctPlayerIds: z.array(z.string().uuid()).optional().default([]),
 });
+
+export const confirmSpecialSettlementSchema = z.object({
+  categoryId: z.string().uuid("Niepoprawne ID kategorii"),
+  expectedHash: z.string().optional(),
+});
+

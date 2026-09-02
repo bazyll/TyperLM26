@@ -24,6 +24,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getMatchesWithPredictionsAction, savePredictionAction } from "@/lib/matches/actions";
 import { calculateLivePoints } from "@/lib/scoring/matches";
 import { MatchWithTeams } from "@/types";
+import { useRealtimeMatches } from "@/lib/supabase/use-realtime-matches";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -68,6 +69,26 @@ export default function MatchesPage() {
   useEffect(() => {
     loadMatches();
   }, []);
+
+  // Supabase Realtime: update match scores and status live without full reload
+  useRealtimeMatches({
+    onMatchUpdate: (updated) => {
+      setMatches((prev) =>
+        prev.map((m) =>
+          m.id === updated.id
+            ? {
+                ...m,
+                homeScore: updated.home_score ?? m.homeScore,
+                awayScore: updated.away_score ?? m.awayScore,
+                status: updated.status,
+                isManualOverride: updated.is_manual_override,
+                isBettingLocked: updated.is_betting_locked,
+              }
+            : m
+        )
+      );
+    },
+  });
 
   const handleTabChange = (tab: "upcoming" | "finished" | "all") => {
     setActiveTab(tab);
@@ -286,7 +307,7 @@ export default function MatchesPage() {
                     {isLive ? (
                       <Badge variant="destructive" className="animate-pulse flex items-center gap-1 font-bold text-[10px] sm:text-xs py-0.5 px-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                        LIVE • {match.liveMinute || 0}&apos;
+                        LIVE
                       </Badge>
                     ) : isFinished ? (
                       <Badge variant="secondary" className="bg-slate-800 text-slate-300 text-[10px] sm:text-xs py-0.5 px-2">

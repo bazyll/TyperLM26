@@ -157,7 +157,15 @@ export async function adminUpdateMatchAction(input: z.infer<typeof updateMatchSc
     return { success: false, error: parsed.error.issues[0]?.message || "Błędne dane meczu." };
   }
 
-  const { matchId, homeTeamId, awayTeamId, kickoffAt, stage, matchday, status, isBettingLocked } = parsed.data;
+  const { matchId, homeTeamId, awayTeamId, kickoffAt, stage, matchday, status, homeScore, awayScore, winnerTeamId, isBettingLocked } = parsed.data;
+
+  if (winnerTeamId && winnerTeamId !== homeTeamId && winnerTeamId !== awayTeamId) {
+    return {
+      success: false,
+      error: "Zwycięzca meczu (winnerTeamId) musi być jedną z dwóch drużyn biorących udział w tym spotkaniu.",
+    };
+  }
+
   const adminSupabase = createAdminClient();
 
   try {
@@ -186,6 +194,9 @@ export async function adminUpdateMatchAction(input: z.infer<typeof updateMatchSc
         stage: stage,
         matchday: matchday,
         status: status,
+        home_score: homeScore !== undefined ? homeScore : oldMatch.home_score,
+        away_score: awayScore !== undefined ? awayScore : oldMatch.away_score,
+        winner_team_id: winnerTeamId !== undefined ? winnerTeamId : oldMatch.winner_team_id,
         is_betting_locked: finalLocked,
         updated_at: new Date().toISOString(),
       })

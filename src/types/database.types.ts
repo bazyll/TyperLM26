@@ -86,9 +86,10 @@ export interface Database {
           name: string;
           short_name: string;
           code: string;
-          logo_url: string;
+          logo_url: string | null;
           uefa_coefficient: number;
           disciplinary_points: number;
+          goal_api_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -96,9 +97,10 @@ export interface Database {
           name: string;
           short_name: string;
           code: string;
-          logo_url: string;
+          logo_url?: string | null;
           uefa_coefficient?: number;
           disciplinary_points?: number;
+          goal_api_id?: string | null;
           created_at?: string;
         };
         Update: {
@@ -106,9 +108,10 @@ export interface Database {
           name?: string;
           short_name?: string;
           code?: string;
-          logo_url?: string;
+          logo_url?: string | null;
           uefa_coefficient?: number;
           disciplinary_points?: number;
+          goal_api_id?: string | null;
           created_at?: string;
         };
         Relationships: [];
@@ -119,21 +122,48 @@ export interface Database {
           name: string;
           team_id: string;
           is_active: boolean;
+          is_ucl_registered: boolean;
+          uefa_player_id: string | null;
+          uefa_list_type: "A" | "B" | null;
+          goal_api_player_id: string | null;
+          goal_api_player_api_id: string | null;
+          position: string | null;
+          jersey_number: string | null;
+          photo_url: string | null;
           created_at: string;
+          updated_at: string;
         };
         Insert: {
           id?: string;
           name: string;
           team_id: string;
           is_active?: boolean;
+          is_ucl_registered?: boolean;
+          uefa_player_id?: string | null;
+          uefa_list_type?: "A" | "B" | null;
+          goal_api_player_id?: string | null;
+          goal_api_player_api_id?: string | null;
+          position?: string | null;
+          jersey_number?: string | null;
+          photo_url?: string | null;
           created_at?: string;
+          updated_at?: string;
         };
         Update: {
           id?: string;
           name?: string;
           team_id?: string;
           is_active?: boolean;
+          is_ucl_registered?: boolean;
+          uefa_player_id?: string | null;
+          uefa_list_type?: "A" | "B" | null;
+          goal_api_player_id?: string | null;
+          goal_api_player_api_id?: string | null;
+          position?: string | null;
+          jersey_number?: string | null;
+          photo_url?: string | null;
           created_at?: string;
+          updated_at?: string;
         };
         Relationships: [
           {
@@ -157,7 +187,12 @@ export interface Database {
           status: MatchStatus;
           home_score: number | null;
           away_score: number | null;
+          winner_team_id: string | null;
+          events_reconciled_at: string | null;
           live_minute: number | null;
+          goal_api_fixture_id: string | null;
+          is_manual_override: boolean;
+          last_synced_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -173,7 +208,12 @@ export interface Database {
           status?: MatchStatus;
           home_score?: number | null;
           away_score?: number | null;
+          winner_team_id?: string | null;
+          events_reconciled_at?: string | null;
           live_minute?: number | null;
+          goal_api_fixture_id?: string | null;
+          is_manual_override?: boolean;
+          last_synced_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -189,7 +229,12 @@ export interface Database {
           status?: MatchStatus;
           home_score?: number | null;
           away_score?: number | null;
+          winner_team_id?: string | null;
+          events_reconciled_at?: string | null;
           live_minute?: number | null;
+          goal_api_fixture_id?: string | null;
+          is_manual_override?: boolean;
+          last_synced_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -598,6 +643,130 @@ export interface Database {
         };
         Relationships: [];
       };
+      match_events: {
+        Row: {
+          id: string;
+          match_id: string;
+          goal_api_event_id: string;
+          event_type: string;
+          minute: number | null;
+          team_id: string | null;
+          side: string | null;
+          scorer_external_id: string | null;
+          scorer_name: string | null;
+          assist_external_id: string | null;
+          assist_name: string | null;
+          info: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          match_id: string;
+          goal_api_event_id: string;
+          event_type: string;
+          minute?: number | null;
+          team_id?: string | null;
+          side?: string | null;
+          scorer_external_id?: string | null;
+          scorer_name?: string | null;
+          assist_external_id?: string | null;
+          assist_name?: string | null;
+          info?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          match_id?: string;
+          goal_api_event_id?: string;
+          event_type?: string;
+          minute?: number | null;
+          team_id?: string | null;
+          side?: string | null;
+          scorer_external_id?: string | null;
+          scorer_name?: string | null;
+          assist_external_id?: string | null;
+          assist_name?: string | null;
+          info?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "match_events_match_id_fkey";
+            columns: ["match_id"];
+            referencedRelation: "matches";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "match_events_team_id_fkey";
+            columns: ["team_id"];
+            referencedRelation: "teams";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      external_api_sync_state: {
+        Row: {
+          provider: string;
+          quota_limit: number | null;
+          quota_remaining: number | null;
+          quota_reset_at: string | null;
+          last_request_at: string | null;
+          last_success_at: string | null;
+          last_error: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          provider: string;
+          quota_limit?: number | null;
+          quota_remaining?: number | null;
+          quota_reset_at?: string | null;
+          last_request_at?: string | null;
+          last_success_at?: string | null;
+          last_error?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          provider?: string;
+          quota_limit?: number | null;
+          quota_remaining?: number | null;
+          quota_reset_at?: string | null;
+          last_request_at?: string | null;
+          last_success_at?: string | null;
+          last_error?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      sync_leases: {
+        Row: {
+          sync_name: string;
+          locked_until: string;
+          locked_by: string;
+          last_started_at: string;
+          last_finished_at: string | null;
+          status: string;
+        };
+        Insert: {
+          sync_name: string;
+          locked_until: string;
+          locked_by: string;
+          last_started_at: string;
+          last_finished_at?: string | null;
+          status?: string;
+        };
+        Update: {
+          sync_name?: string;
+          locked_until?: string;
+          locked_by?: string;
+          last_started_at?: string;
+          last_finished_at?: string | null;
+          status?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -610,6 +779,35 @@ export interface Database {
       is_active_user: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      acquire_sync_lease: {
+        Args: {
+          p_sync_name: string;
+          p_locked_by: string;
+          p_duration_seconds?: number;
+        };
+        Returns: boolean;
+      };
+      release_sync_lease: {
+        Args: {
+          p_sync_name: string;
+          p_locked_by: string;
+          p_status?: string;
+        };
+        Returns: void;
+      };
+      get_ucl_scorers_and_assists: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          player_name: string;
+          scorer_external_id: string | null;
+          team_id: string | null;
+          team_name: string | null;
+          team_code: string | null;
+          team_logo_url: string | null;
+          goals_count: number;
+          assists_count: number;
+        }[];
       };
       check_and_record_login_attempt: {
         Args: {

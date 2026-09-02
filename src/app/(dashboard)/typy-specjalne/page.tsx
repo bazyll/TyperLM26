@@ -31,9 +31,6 @@ export default async function SpecialPredictionsPage() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           Typy Specjalne
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Wskaż triumfatorów, króla strzelców i statystyki sezonu. Do momentu upływu deadline&apos;u Twoje typy są ukryte dla rywali.
-        </p>
       </div>
 
       <div className="flex items-center gap-3 p-4 rounded-2xl bg-blue-950/40 border border-blue-500/20 text-xs text-blue-300">

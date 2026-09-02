@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { TeamLogo } from "@/components/team-logo";
 import { Star, ChevronRight } from "lucide-react";
@@ -8,13 +8,38 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { MatchWithTeams } from "@/types";
+import { useRealtimeMatches } from "@/lib/supabase/use-realtime-matches";
 
 interface UpcomingMatchesProps {
   matches: MatchWithTeams[];
 }
 
-export function UpcomingMatches({ matches }: UpcomingMatchesProps) {
+export function UpcomingMatches({ matches: initialMatches }: UpcomingMatchesProps) {
+  const [matches, setMatches] = useState<MatchWithTeams[]>(initialMatches);
   const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    setMatches(initialMatches);
+  }, [initialMatches]);
+
+  useRealtimeMatches({
+    onMatchUpdate: (updated) => {
+      setMatches((prev) =>
+        prev.map((m) =>
+          m.id === updated.id
+            ? {
+                ...m,
+                homeScore: updated.home_score ?? m.homeScore,
+                awayScore: updated.away_score ?? m.awayScore,
+                status: updated.status,
+                isManualOverride: updated.is_manual_override,
+                isBettingLocked: updated.is_betting_locked,
+              }
+            : m
+        )
+      );
+    },
+  });
 
   const toggleFav = (id: string) => {
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -84,7 +109,7 @@ export function UpcomingMatches({ matches }: UpcomingMatchesProps) {
                   <div className="flex flex-col text-xs leading-tight">
                     {isLive ? (
                       <Badge variant="destructive" className="animate-pulse text-[10px] px-1.5 py-0 font-bold">
-                        LIVE {match.liveMinute}&apos;
+                        LIVE
                       </Badge>
                     ) : (
                       <>

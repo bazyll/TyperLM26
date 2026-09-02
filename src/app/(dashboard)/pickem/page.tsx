@@ -17,9 +17,6 @@ export default async function PickemPage() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           Pick&apos;em Tabeli Ligowej
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Podziel 36 drużyn na strefy końcowej tabeli fazy ligowej. Trafienie w strefę daje 3 punkty za każdy klub.
-        </p>
       </div>
 
       <div className="flex items-center gap-3 p-4 rounded-2xl bg-blue-950/40 border border-blue-500/20 text-xs text-blue-300">

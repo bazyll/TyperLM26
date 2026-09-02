@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Moon, Bell, ChevronDown, User, Settings, LogOut, Shield } from "lucide-react";
+import { ChevronDown, User, LogOut, Shield } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -22,7 +22,6 @@ interface HeaderProps {
     role?: "user" | "admin";
     points?: number;
   };
-  unreadCount?: number;
 }
 
 export function Header({
@@ -34,13 +33,12 @@ export function Header({
     role: "admin",
     points: 1250,
   },
-  unreadCount = 0,
 }: HeaderProps) {
   const initials = `${user.firstName[0] || "U"}${user.lastName[0] || ""}`;
 
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between h-18 px-4 sm:px-8 bg-[#070b14]/80 backdrop-blur-md border-b border-[#182645]/60">
-      {/* Left side: Mobile Brand or Search */}
+      {/* Left side: Mobile Brand */}
       <div className="flex items-center gap-3 lg:hidden">
         <Link href="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md shadow-blue-600/30">
@@ -56,32 +54,8 @@ export function Header({
         {/* Placeholder for desktop breadcrumb / title */}
       </div>
 
-      {/* Right side: Theme, Notifications, User Pill */}
-      <div className="flex items-center gap-3 sm:gap-4 ml-auto">
-        {/* Theme Toggle (Dark indicator) */}
-        <button
-          type="button"
-          aria-label="Tryb ciemny"
-          className="flex items-center justify-center w-10 h-10 rounded-full border border-[#182645] bg-[#0c1527] text-slate-300 hover:text-white hover:border-blue-500/40 transition-all cursor-pointer"
-        >
-          <Moon className="w-4 h-4 text-blue-400" />
-        </button>
-
-        {/* Notifications Bell with Badge */}
-        <Link
-          href="/ogloszenia"
-          aria-label="Powiadomienia"
-          className="relative flex items-center justify-center w-10 h-10 rounded-full border border-[#182645] bg-[#0c1527] text-slate-300 hover:text-white hover:border-blue-500/40 transition-all"
-        >
-          <Bell className="w-4 h-4 text-slate-300" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-blue-600 text-[10px] font-bold text-white border-2 border-[#070b14] animate-in zoom-in-50">
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </span>
-          )}
-        </Link>
-
-        {/* User Pill Dropdown */}
+      {/* Right side: User Pill Dropdown */}
+      <div className="flex items-center ml-auto">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-3 pl-1.5 pr-3 py-1.5 rounded-full border border-[#182645] bg-[#0c1527] hover:bg-[#101d36] hover:border-blue-500/40 transition-all cursor-pointer">
@@ -117,22 +91,15 @@ export function Header({
             <DropdownMenuSeparator />
 
             <DropdownMenuItem asChild>
-              <Link href={`/profil/${user.username}`} className="flex items-center gap-2">
+              <Link href="/konto" className="flex items-center gap-2 cursor-pointer">
                 <User className="w-4 h-4 text-slate-400" />
-                <span>Mój profil</span>
-              </Link>
-            </DropdownMenuItem>
-
-            <DropdownMenuItem asChild>
-              <Link href="/konto" className="flex items-center gap-2">
-                <Settings className="w-4 h-4 text-slate-400" />
-                <span>Ustawienia konta</span>
+                <span>Moje konto</span>
               </Link>
             </DropdownMenuItem>
 
             {user.role === "admin" && (
               <DropdownMenuItem asChild>
-                <Link href="/admin" className="flex items-center gap-2 text-blue-400">
+                <Link href="/admin" className="flex items-center gap-2 text-blue-400 cursor-pointer">
                   <Shield className="w-4 h-4" />
                   <span>Panel administratora</span>
                 </Link>

@@ -12,6 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { TeamLogo } from "@/components/team-logo";
 import { getRankingPageDataAction } from "@/lib/matches/actions";
 import { LeaderboardEntry, MatchWithTeams } from "@/types";
+import { useRealtimeMatches } from "@/lib/supabase/use-realtime-matches";
 import Link from "next/link";
 
 export default function RankingPage() {
@@ -19,21 +20,47 @@ export default function RankingPage() {
   const [focusMatches, setFocusMatches] = useState<MatchWithTeams[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadData() {
-      setLoading(true);
-      try {
-        const data = await getRankingPageDataAction();
-        setLeaderboard(data.leaderboard);
-        setFocusMatches(data.focusMatches);
-      } catch (err) {
-        console.error("Error loading ranking data:", err);
-      } finally {
-        setLoading(false);
-      }
+  const loadData = async (showSpinner = true) => {
+    if (showSpinner) setLoading(true);
+    try {
+      const data = await getRankingPageDataAction();
+      setLeaderboard(data.leaderboard);
+      setFocusMatches(data.focusMatches);
+    } catch (err) {
+      console.error("Error loading ranking data:", err);
+    } finally {
+      if (showSpinner) setLoading(false);
     }
+  };
+
+  useEffect(() => {
     loadData();
   }, []);
+
+  // Supabase Realtime: update match scores live & reload leaderboard when match finishes
+  useRealtimeMatches({
+    onMatchUpdate: (updated) => {
+      setFocusMatches((prev) =>
+        prev.map((m) =>
+          m.id === updated.id
+            ? {
+                ...m,
+                homeScore: updated.home_score ?? m.homeScore,
+                awayScore: updated.away_score ?? m.awayScore,
+                status: updated.status,
+                isManualOverride: updated.is_manual_override,
+                isBettingLocked: updated.is_betting_locked,
+              }
+            : m
+        )
+      );
+
+      // If a match is finalized, refresh official leaderboard without full-page spinner
+      if (updated.status === "finished") {
+        loadData(false);
+      }
+    },
+  });
 
   if (loading) {
     return (
@@ -56,9 +83,6 @@ export default function RankingPage() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           Ranking Główny Uczestników
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Suma punktów ze wszystkich modułów oraz szybkie porównanie ostatnich typów.
-        </p>
       </div>
 
       {/* Subtle Top 3 Podium */}
@@ -200,7 +224,7 @@ export default function RankingPage() {
                       <div className="text-[10px] mt-0.5 font-mono font-bold">
                         {isLive ? (
                           <span className="text-red-400">
-                            LIVE {m.liveMinute}&apos; • {m.homeScore ?? 0}:{m.awayScore ?? 0}
+                            LIVE • {m.homeScore ?? 0}:{m.awayScore ?? 0}
                           </span>
                         ) : (
                           <span className="text-blue-300">

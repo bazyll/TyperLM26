@@ -36,14 +36,14 @@ export interface MatchWithTeams {
     name: string;
     shortName: string;
     code: string;
-    logoUrl: string;
+    logoUrl: string | null;
   };
   awayTeam: {
     id: string;
     name: string;
     shortName: string;
     code: string;
-    logoUrl: string;
+    logoUrl: string | null;
   };
   userPrediction?: {
     id?: string;
@@ -140,7 +140,7 @@ export interface PickemSelectionItem {
   teamId: string;
   teamName: string;
   teamCode: string;
-  teamLogoUrl: string;
+  teamLogoUrl: string | null;
   category: "first" | "top8" | "out" | "middle";
   finalRank?: number;
   pointsAwarded?: number;
