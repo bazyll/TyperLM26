@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { ALLOWED_AVATAR_MIME_TYPES, MAX_AVATAR_SIZE_BYTES } from "./storage";
+import {
+  ALLOWED_AVATAR_MIME_TYPES,
+  MAX_AVATAR_SIZE_BYTES,
+  extractAvatarPath,
+} from "./storage";
 
 describe("Storage Avatar Validation Rules", () => {
   it("enforces allowed MIME types whitelist (JPG, PNG, WebP)", () => {
@@ -16,32 +20,42 @@ describe("Storage Avatar Validation Rules", () => {
     expect(MAX_AVATAR_SIZE_BYTES).toBe(2097152); // exactly 2 * 1024 * 1024
   });
 
-  describe("Avatar URL & Storage Path Extraction for Cleanup", () => {
-    const extractPath = (url: string): string | null => {
-      const match = url.match(/\/avatars\/([^?#]+)/);
-      return match && match[1] ? decodeURIComponent(match[1]) : null;
-    };
+  describe("extractAvatarPath helper", () => {
+    it("handles clean relative storage path directly", () => {
+      expect(extractAvatarPath("user-123/avatar_1725200000.webp")).toBe("user-123/avatar_1725200000.webp");
+    });
+
+    it("strips trailing query parameters from clean path", () => {
+      expect(extractAvatarPath("user-123/avatar_1725200000.webp?token=xyz")).toBe("user-123/avatar_1725200000.webp");
+    });
 
     it("extracts clean storage path from signed avatar URL without query token", () => {
       const signedUrl =
         "https://example.supabase.co/storage/v1/object/sign/avatars/user-123/avatar_1725200000.jpg?token=eyJhbGciOiJIUzI1NiJ9.abc";
-      const path = extractPath(signedUrl);
+      const path = extractAvatarPath(signedUrl);
       expect(path).toBe("user-123/avatar_1725200000.jpg");
     });
 
     it("extracts clean storage path from legacy public avatar URL", () => {
       const publicUrl =
         "https://example.supabase.co/storage/v1/object/public/avatars/user-123/avatar_1725100000.png";
-      const path = extractPath(publicUrl);
+      const path = extractAvatarPath(publicUrl);
       expect(path).toBe("user-123/avatar_1725100000.png");
+    });
+
+    it("returns null for null, undefined, empty, or whitespace inputs", () => {
+      expect(extractAvatarPath(null)).toBe(null);
+      expect(extractAvatarPath(undefined)).toBe(null);
+      expect(extractAvatarPath("")).toBe(null);
+      expect(extractAvatarPath("   ")).toBe(null);
     });
 
     it("prevents deleting newly uploaded avatar file when old and new paths match", () => {
       const oldUrl = "https://example.supabase.co/storage/v1/object/sign/avatars/user-123/avatar_1.jpg?token=abc";
-      const newUrl = "https://example.supabase.co/storage/v1/object/sign/avatars/user-123/avatar_1.jpg?token=xyz";
+      const newUrl = "user-123/avatar_1.jpg";
 
-      const oldPath = extractPath(oldUrl);
-      const newPath = extractPath(newUrl);
+      const oldPath = extractAvatarPath(oldUrl);
+      const newPath = extractAvatarPath(newUrl);
 
       expect(oldPath).toBe("user-123/avatar_1.jpg");
       expect(newPath).toBe("user-123/avatar_1.jpg");
@@ -50,10 +64,10 @@ describe("Storage Avatar Validation Rules", () => {
 
     it("identifies distinct files for cleanup when user uploads a new avatar", () => {
       const oldUrl = "https://example.supabase.co/storage/v1/object/sign/avatars/user-123/avatar_old.jpg?token=abc";
-      const newUrl = "https://example.supabase.co/storage/v1/object/sign/avatars/user-123/avatar_new.png?token=xyz";
+      const newPathInput = "user-123/avatar_new.png";
 
-      const oldPath = extractPath(oldUrl);
-      const newPath = extractPath(newUrl);
+      const oldPath = extractAvatarPath(oldUrl);
+      const newPath = extractAvatarPath(newPathInput);
 
       expect(oldPath).toBe("user-123/avatar_old.jpg");
       expect(newPath).toBe("user-123/avatar_new.png");

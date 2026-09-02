@@ -11,6 +11,7 @@ import { validatePickemSubmission } from "@/lib/scoring/pickem";
 import { calculateUCLTable } from "@/lib/scoring/ucl-table";
 import { PickemSubmissionWithDetails, PickemSelectionItem } from "@/types";
 import { Database } from "@/types/database.types";
+import { getAvatarSignedUrls } from "@/lib/supabase/storage";
 
 type TeamRow = Database["public"]["Tables"]["teams"]["Row"];
 type ConfigRow = Database["public"]["Tables"]["pickem_config"]["Row"];
@@ -116,6 +117,9 @@ export async function getPickemDataAction(): Promise<{
   }
 
   // Build revealed submissions list
+  const subRawAvatars = submissions.map((s) => (s.profile as ProfileRow | undefined)?.avatar_url);
+  const subAvatarUrls = await getAvatarSignedUrls(subRawAvatars, 3600);
+
   const allSubmissions = submissions.map((sub) => {
     const subSels = selectionsMap.get(sub.id) || [];
     const firstSel = subSels.find((s) => s.category === "first");
@@ -123,12 +127,14 @@ export async function getPickemDataAction(): Promise<{
     const outSels = subSels.filter((s) => s.category === "out");
 
     const prof = sub.profile as ProfileRow | undefined;
+    const signedAvatar = prof?.avatar_url ? subAvatarUrls.get(prof.avatar_url) || null : null;
+
     return {
       userId: sub.user_id,
       username: prof?.username || "gracz",
       firstName: prof?.first_name || "Gracz",
       lastName: prof?.last_name || "",
-      avatarUrl: prof?.avatar_url || null,
+      avatarUrl: signedAvatar,
       pointsAwarded: sub.points_awarded,
       firstTeamId: firstSel?.team_id,
       top8TeamIds: top8Sels.map((s) => s.team_id),

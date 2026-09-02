@@ -14,6 +14,7 @@ import {
   finalizeMatchSchema,
 } from "./schemas";
 import { calculateLivePoints } from "@/lib/scoring/matches";
+import { getAvatarSignedUrls } from "@/lib/supabase/storage";
 import { MatchWithTeams, LeaderboardEntry, UserMatchStats } from "@/types";
 import { Database } from "@/types/database.types";
 
@@ -362,6 +363,9 @@ export async function getMatchesWithPredictionsAction(): Promise<MatchWithTeams[
     away_team: TeamRow;
   }>;
 
+  const rawAvatars = predictions.map((p) => (p.profile as ProfileRow | undefined)?.avatar_url);
+  const avatarSignedUrls = await getAvatarSignedUrls(rawAvatars, 3600);
+
   return matches.map((m) => {
     const matchPreds = predictionMap.get(m.id) || [];
     const myPred = currentUser ? matchPreds.find((p) => p.user_id === currentUser.id) : undefined;
@@ -372,12 +376,14 @@ export async function getMatchesWithPredictionsAction(): Promise<MatchWithTeams[
         : (p.points_awarded ?? 0);
 
       const prof = p.profile as ProfileRow | undefined;
+      const signedAvatar = prof?.avatar_url ? avatarSignedUrls.get(prof.avatar_url) || null : null;
+
       return {
         userId: p.user_id,
         username: prof?.username || "gracz",
         firstName: prof?.first_name || "Gracz",
         lastName: prof?.last_name || "",
-        avatarUrl: prof?.avatar_url || null,
+        avatarUrl: signedAvatar,
         homeScore: p.home_score,
         awayScore: p.away_score,
         pointsAwarded: p.points_awarded,
@@ -508,10 +514,16 @@ export async function getLeaderboardAction(): Promise<LeaderboardEntry[]> {
     }
   });
 
+  const leaderboardAvatarUrls = await getAvatarSignedUrls(
+    profiles.map((p) => p.avatar_url),
+    3600
+  );
+
   const entries: LeaderboardEntry[] = profiles.map((p) => {
     const s = statsMap.get(p.id)!;
     const accuracy = s.count > 0 ? Math.round(((s.exact + s.diff + s.outcome) / s.count) * 100) : 0;
     const totalPoints = s.matchPoints + s.specialPoints + s.pickemPoints;
+    const signedAvatar = p.avatar_url ? leaderboardAvatarUrls.get(p.avatar_url) || null : null;
 
     return {
       rank: 1,
@@ -519,7 +531,7 @@ export async function getLeaderboardAction(): Promise<LeaderboardEntry[]> {
       username: p.username,
       firstName: p.first_name,
       lastName: p.last_name,
-      avatarUrl: p.avatar_url,
+      avatarUrl: signedAvatar,
       matchPoints: s.matchPoints,
       specialPoints: s.specialPoints,
       pickemPoints: s.pickemPoints,

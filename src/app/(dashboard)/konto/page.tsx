@@ -109,16 +109,18 @@ export default function AccountPage() {
 
     startTransition(async () => {
       const uploadRes = await uploadAvatar(profile.id, file);
-      if (!uploadRes.success || !uploadRes.avatarUrl) {
+      if (!uploadRes.success || !uploadRes.avatarPath) {
         setStatusMessage({ type: "error", text: uploadRes.error || "Błąd podczas przesyłania zdjęcia." });
         return;
       }
 
-      const updateRes = await updateAvatarUrlAction(uploadRes.avatarUrl);
+      // Pass the clean avatarPath to the server action (Source of Truth in DB)
+      const updateRes = await updateAvatarUrlAction(uploadRes.avatarPath);
       if (!updateRes.success) {
         setStatusMessage({ type: "error", text: updateRes.error || "Błąd podczas zapisu avatara." });
       } else {
-        setProfile({ ...profile, avatarUrl: uploadRes.avatarUrl });
+        // Update local state with the preview signed URL
+        setProfile({ ...profile, avatarUrl: uploadRes.avatarUrl || uploadRes.avatarPath });
         setStatusMessage({ type: "success", text: "Zdjęcie profilowe zostało zaktualizowane!" });
       }
     });

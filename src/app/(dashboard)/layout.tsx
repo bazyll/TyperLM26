@@ -5,6 +5,8 @@ import { Footer } from "@/components/layout/footer";
 import { getCurrentUserProfile } from "@/lib/auth/actions";
 import { getUnreadAnnouncementsCountAction } from "@/lib/announcements/actions";
 
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {

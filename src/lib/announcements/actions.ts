@@ -12,6 +12,7 @@ import {
 } from "./schemas";
 import { AnnouncementItem } from "@/types";
 import { Database } from "@/types/database.types";
+import { getAvatarSignedUrls } from "@/lib/supabase/storage";
 
 type AnnouncementRow = Database["public"]["Tables"]["announcements"]["Row"];
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
@@ -43,17 +44,25 @@ export async function getAnnouncementsAction(): Promise<AnnouncementItem[]> {
     }
   >;
 
-  return items.map((a) => ({
-    id: a.id,
-    authorId: a.author_id,
-    authorName: a.author ? `${a.author.first_name} ${a.author.last_name}` : "Organizator",
-    authorAvatarUrl: a.author?.avatar_url || null,
-    title: a.title,
-    content: a.content,
-    isPinned: a.is_pinned,
-    createdAt: a.created_at,
-    updatedAt: a.updated_at,
-  }));
+  const authorAvatars = items.map((a) => a.author?.avatar_url);
+  const avatarSignedUrls = await getAvatarSignedUrls(authorAvatars, 3600);
+
+  return items.map((a) => {
+    const rawAvatar = a.author?.avatar_url;
+    const signedAvatar = rawAvatar ? avatarSignedUrls.get(rawAvatar) || null : null;
+
+    return {
+      id: a.id,
+      authorId: a.author_id,
+      authorName: a.author ? `${a.author.first_name} ${a.author.last_name}` : "Organizator",
+      authorAvatarUrl: signedAvatar,
+      title: a.title,
+      content: a.content,
+      isPinned: a.is_pinned,
+      createdAt: a.created_at,
+      updatedAt: a.updated_at,
+    };
+  });
 }
 
 /**

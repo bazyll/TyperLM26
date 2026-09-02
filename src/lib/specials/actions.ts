@@ -14,6 +14,7 @@ import {
 } from "./schemas";
 import { SpecialCategoryWithPrediction } from "@/types";
 import { Database } from "@/types/database.types";
+import { getAvatarSignedUrls } from "@/lib/supabase/storage";
 
 type CategoryRow = Database["public"]["Tables"]["special_prediction_categories"]["Row"];
 type SpecialPredictionRow = Database["public"]["Tables"]["special_predictions"]["Row"];
@@ -87,6 +88,9 @@ export async function getSpecialCategoriesWithPredictionsAction(): Promise<Speci
     predMap.set(p.category_id, list);
   });
 
+  const specialRawAvatars = predictions.map((p) => p.profile?.avatar_url);
+  const avatarUrlsMap = await getAvatarSignedUrls(specialRawAvatars, 3600);
+
   return categories.map((cat) => {
     const categoryPreds = predMap.get(cat.id) || [];
     const myPred = currentUser ? categoryPreds.find((p) => p.user_id === currentUser.id) : undefined;
@@ -117,12 +121,14 @@ export async function getSpecialCategoriesWithPredictionsAction(): Promise<Speci
 
     const allPreds = categoryPreds.map((p) => {
       const prof = p.profile as ProfileRow | undefined;
+      const signedAvatar = prof?.avatar_url ? avatarUrlsMap.get(prof.avatar_url) || null : null;
+
       return {
         userId: p.user_id,
         username: prof?.username || "gracz",
         firstName: prof?.first_name || "Gracz",
         lastName: prof?.last_name || "",
-        avatarUrl: prof?.avatar_url || null,
+        avatarUrl: signedAvatar,
         selectedTeamId: p.selected_team_id,
         selectedTeamName: p.selected_team_id ? teamsMap.get(p.selected_team_id)?.name : undefined,
         selectedPlayerId: p.selected_player_id,

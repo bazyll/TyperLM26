@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getAvatarSignedUrl, extractAvatarPath } from "@/lib/supabase/storage";
 import { UserProfile } from "@/types";
 import { Database } from "@/types/database.types";
 import {
@@ -152,12 +153,17 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
       return null;
     }
 
+    let signedAvatarUrl: string | null = null;
+    if (profile.avatar_url) {
+      signedAvatarUrl = await getAvatarSignedUrl(profile.avatar_url, 3600);
+    }
+
     return {
       id: profile.id,
       username: profile.username,
       firstName: profile.first_name,
       lastName: profile.last_name,
-      avatarUrl: profile.avatar_url,
+      avatarUrl: signedAvatarUrl,
       role: profile.role,
       isActive: profile.is_active,
       points: 0,
@@ -287,38 +293,37 @@ export async function changePasswordAction(newPassword: string): Promise<ActionR
 }
 
 /**
- * Server Action: Update Avatar URL with safe old file cleanup
+ * Server Action: Update Avatar Path with safe old file cleanup
  */
-export async function updateAvatarUrlAction(newAvatarUrl: string): Promise<ActionResult> {
+export async function updateAvatarUrlAction(newAvatarPathOrUrl: string): Promise<ActionResult> {
   const currentUser = await getCurrentUserProfile();
   if (!currentUser) return { success: false, error: "Wymagane logowanie." };
 
   try {
     const adminSupabase = createAdminClient();
-    const oldAvatarUrl = currentUser.avatarUrl;
+    const cleanNewPath = extractAvatarPath(newAvatarPathOrUrl) || newAvatarPathOrUrl.trim();
 
-    // 1. Update profiles table with new avatar URL
+    // Query current raw avatar from database for accurate path extraction
+    const { data: currentProfile } = await adminSupabase
+      .from("profiles")
+      .select("avatar_url")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+
+    const oldCleanPath = extractAvatarPath(currentProfile?.avatar_url || currentUser.avatarUrl);
+
+    // 1. Update profiles table with clean avatar path (Source of Truth - NO ?token=...)
     const { error } = await adminSupabase
       .from("profiles")
-      .update({ avatar_url: newAvatarUrl, updated_at: new Date().toISOString() })
+      .update({ avatar_url: cleanNewPath, updated_at: new Date().toISOString() })
       .eq("id", currentUser.id);
 
     if (error) throw error;
 
     // 2. Cleanup: delete previous avatar file from storage if different
-    if (oldAvatarUrl && oldAvatarUrl !== newAvatarUrl) {
+    if (oldCleanPath && cleanNewPath && oldCleanPath !== cleanNewPath) {
       try {
-        const extractPath = (url: string): string | null => {
-          const match = url.match(/\/avatars\/([^?#]+)/);
-          return match && match[1] ? decodeURIComponent(match[1]) : null;
-        };
-
-        const oldFilePath = extractPath(oldAvatarUrl);
-        const newFilePath = extractPath(newAvatarUrl);
-
-        if (oldFilePath && newFilePath && oldFilePath !== newFilePath) {
-          await adminSupabase.storage.from("avatars").remove([oldFilePath]);
-        }
+        await adminSupabase.storage.from("avatars").remove([oldCleanPath]);
       } catch (cleanupErr) {
         console.warn("Could not delete old avatar file:", cleanupErr);
       }

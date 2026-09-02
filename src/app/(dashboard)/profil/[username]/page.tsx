@@ -9,6 +9,7 @@ import { getUserStatsAction, getLeaderboardAction } from "@/lib/matches/actions"
 import { Database } from "@/types/database.types";
 import { TeamLogo } from "@/components/team-logo";
 import { ProfilePredictionsHistory, ProfilePredictionItem } from "@/components/profile/profile-predictions-history";
+import { getAvatarSignedUrl } from "@/lib/supabase/storage";
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type PredictionRow = Database["public"]["Tables"]["predictions"]["Row"];
@@ -90,6 +91,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const canViewPickem = isOwner || isPickemLocked;
 
   const initials = `${profile.first_name[0] || "U"}${profile.last_name[0] || ""}`;
+  const signedAvatarUrl = profile.avatar_url ? await getAvatarSignedUrl(profile.avatar_url, 3600) : null;
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
@@ -97,7 +99,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       <Card className="rounded-3xl border-slate-800 bg-slate-900 p-6 sm:p-8 shadow-2xl relative overflow-hidden">
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
           <Avatar className="w-24 h-24 sm:w-28 sm:h-28 border-2 border-blue-500/40 shadow-xl">
-            {profile.avatar_url && <AvatarImage src={profile.avatar_url} alt={profile.first_name} />}
+            {signedAvatarUrl && <AvatarImage src={signedAvatarUrl} alt={profile.first_name} />}
             <AvatarFallback className="bg-gradient-to-br from-blue-900 to-indigo-950 text-2xl font-bold text-blue-300">
               {initials}
             </AvatarFallback>
