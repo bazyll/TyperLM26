@@ -169,8 +169,11 @@ export async function adminCreateAnnouncementAction(
   let admin;
   try {
     admin = await requireAdminRole();
-  } catch (err: any) {
-    return { success: false, error: err.message || "Brak uprawnień administratora." };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Brak uprawnień administratora.",
+    };
   }
 
   const parsed = createAnnouncementSchema.safeParse(input);
@@ -222,8 +225,11 @@ export async function adminUpdateAnnouncementAction(
   let admin;
   try {
     admin = await requireAdminRole();
-  } catch (err: any) {
-    return { success: false, error: err.message || "Brak uprawnień administratora." };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Brak uprawnień administratora.",
+    };
   }
 
   const parsed = updateAnnouncementSchema.safeParse(input);
@@ -272,8 +278,11 @@ export async function adminDeleteAnnouncementAction(id: string): Promise<ActionR
   let admin;
   try {
     admin = await requireAdminRole();
-  } catch (err: any) {
-    return { success: false, error: err.message || "Brak uprawnień administratora." };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Brak uprawnień administratora.",
+    };
   }
 
   const adminSupabase = createAdminClient();
@@ -306,8 +315,11 @@ export async function adminTogglePinAnnouncementAction(id: string, isPinned: boo
   let admin;
   try {
     admin = await requireAdminRole();
-  } catch (err: any) {
-    return { success: false, error: err.message || "Brak uprawnień administratora." };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Brak uprawnień administratora.",
+    };
   }
 
   const adminSupabase = createAdminClient();

@@ -479,8 +479,11 @@ export default function AdminPage() {
         } else {
           setStatusMessage({ type: "error", text: res.error || "Błąd dodawania ogłoszenia." });
         }
-      } catch (err: any) {
-        setStatusMessage({ type: "error", text: err.message || "Błąd dodawania ogłoszenia." });
+      } catch (err) {
+        setStatusMessage({
+          type: "error",
+          text: err instanceof Error ? err.message : "Błąd dodawania ogłoszenia.",
+        });
       }
     });
   };
@@ -503,8 +506,11 @@ export default function AdminPage() {
         } else {
           setStatusMessage({ type: "error", text: res.error || "Błąd edycji ogłoszenia." });
         }
-      } catch (err: any) {
-        setStatusMessage({ type: "error", text: err.message || "Błąd edycji ogłoszenia." });
+      } catch (err) {
+        setStatusMessage({
+          type: "error",
+          text: err instanceof Error ? err.message : "Błąd edycji ogłoszenia.",
+        });
       }
     });
   };
@@ -520,8 +526,11 @@ export default function AdminPage() {
         } else {
           setStatusMessage({ type: "error", text: res.error || "Błąd usuwania ogłoszenia." });
         }
-      } catch (err: any) {
-        setStatusMessage({ type: "error", text: err.message || "Błąd usuwania ogłoszenia." });
+      } catch (err) {
+        setStatusMessage({
+          type: "error",
+          text: err instanceof Error ? err.message : "Błąd usuwania ogłoszenia.",
+        });
       }
     });
   };
@@ -539,8 +548,11 @@ export default function AdminPage() {
         } else {
           setStatusMessage({ type: "error", text: res.error || "Błąd zmiany przypięcia." });
         }
-      } catch (err: any) {
-        setStatusMessage({ type: "error", text: err.message || "Błąd zmiany przypięcia." });
+      } catch (err) {
+        setStatusMessage({
+          type: "error",
+          text: err instanceof Error ? err.message : "Błąd zmiany przypięcia.",
+        });
       }
     });
   };
@@ -1035,7 +1047,12 @@ export default function AdminPage() {
                       {u.first_name} {u.last_name} (@{u.username})
                     </td>
                     <td className="py-3.5 px-4">
-                      <button onClick={() => handleToggleRole(u)} className="cursor-pointer">
+                      <button
+                        type="button"
+                        aria-label={`Zmień rolę dla @${u.username}`}
+                        onClick={() => handleToggleRole(u)}
+                        className="cursor-pointer"
+                      >
                         <Badge variant={u.role === "admin" ? "default" : "secondary"}>
                           {u.role === "admin" ? "Admin" : "User"}
                         </Badge>
