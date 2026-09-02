@@ -1,11 +1,13 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Lock, User, Eye, EyeOff, Sparkles, AlertCircle } from "lucide-react";
+import { Lock, User, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { loginWithUsernameAction } from "@/lib/auth/actions";
 import { ActionResult } from "@/lib/auth/schemas";
+import { UclStarballBackground } from "@/components/branding/ucl-starball-background";
+import { UclBrandMark } from "@/components/branding/ucl-brand-mark";
 
 const initialState: ActionResult = {
   success: false,
@@ -20,16 +22,13 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#070b14] p-4 relative overflow-hidden">
-      {/* Background Ambient Glow */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
+      {/* UEFA Champions League Ambient Lighting & Starball Layer */}
+      <UclStarballBackground />
 
       <div className="w-full max-w-md relative z-10 flex flex-col gap-6">
         {/* Logo Header */}
         <div className="flex flex-col items-center text-center gap-2">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-800 flex items-center justify-center text-white shadow-xl shadow-blue-600/30">
-            <Sparkles className="w-7 h-7 text-blue-200" />
-          </div>
+          <UclBrandMark size={56} className="shadow-2xl shadow-blue-500/40" />
           <h1 className="text-2xl font-bold text-white tracking-tight mt-2">
             Typer<span className="text-blue-500 font-extrabold">LM26</span>
           </h1>

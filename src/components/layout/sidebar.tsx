@@ -9,9 +9,9 @@ import {
   Star,
   Target,
   Bell,
-  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UclBrandMark } from "@/components/branding/ucl-brand-mark";
 
 interface SidebarProps {
   unreadCount?: number;
@@ -57,13 +57,11 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   const isHome = pathname === "/";
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 shrink-0 min-h-screen bg-[#070b14] border-r border-[#182645] p-5 select-none">
+    <aside className="hidden lg:flex flex-col w-64 shrink-0 min-h-screen bg-[#070b14] border-r border-[#182645] p-5 select-none relative z-20">
       <div className="flex flex-col gap-8">
-        {/* Brand Logo */}
+        {/* Brand Logo with UCL Starball Mark */}
         <Link href="/" className="flex items-center gap-3 px-2 group">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-800 text-white shadow-lg shadow-blue-600/30 group-hover:scale-105 transition-transform">
-            <Sparkles className="w-5 h-5 animate-pulse text-blue-200" />
-          </div>
+          <UclBrandMark size={38} className="group-hover:scale-105 transition-transform" />
           <div className="flex items-baseline gap-1">
             <span className="text-xl font-bold tracking-tight text-white">
               Typer<span className="text-blue-500 font-extrabold">LM26</span>

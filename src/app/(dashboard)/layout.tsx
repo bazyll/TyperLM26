@@ -4,6 +4,7 @@ import { MobileNav } from "@/components/layout/mobile-nav";
 import { Footer } from "@/components/layout/footer";
 import { getCurrentUserProfile } from "@/lib/auth/actions";
 import { getUnreadAnnouncementsCountAction } from "@/lib/announcements/actions";
+import { UclStarballBackground } from "@/components/branding/ucl-starball-background";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +39,15 @@ export default async function DashboardLayout({
       };
 
   return (
-    <div className="flex min-h-screen bg-[#070b14]">
+    <div className="flex min-h-screen bg-[#070b14] relative">
+      {/* UEFA Champions League Ambient Lighting & Starball Layer */}
+      <UclStarballBackground />
+
       {/* Desktop Sidebar with Unread Announcements Indicator */}
       <Sidebar unreadCount={unreadCount} />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
+      <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0 relative z-10">
         {/* Top Header */}
         <Header user={userProp} />
 

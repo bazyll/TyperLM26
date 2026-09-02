@@ -25,6 +25,7 @@ import { getMatchesWithPredictionsAction, savePredictionAction } from "@/lib/mat
 import { calculateLivePoints } from "@/lib/scoring/matches";
 import { MatchWithTeams } from "@/types";
 import { useRealtimeMatches } from "@/lib/supabase/use-realtime-matches";
+import { UclHeaderAccent } from "@/components/branding/ucl-header-accent";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -204,6 +205,7 @@ export default function MatchesPage() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             Mecze i Typowanie
           </h1>
+          <UclHeaderAccent />
         </div>
 
         {/* Filter Tabs in requested exact order: Najbliższe, Zakończone, Wszystkie */}

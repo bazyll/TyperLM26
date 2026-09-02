@@ -13,6 +13,7 @@ import { TeamLogo } from "@/components/team-logo";
 import { getRankingPageDataAction } from "@/lib/matches/actions";
 import { LeaderboardEntry, MatchWithTeams } from "@/types";
 import { useRealtimeMatches } from "@/lib/supabase/use-realtime-matches";
+import { UclHeaderAccent } from "@/components/branding/ucl-header-accent";
 import Link from "next/link";
 
 export default function RankingPage() {
@@ -83,6 +84,7 @@ export default function RankingPage() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           Ranking Główny Uczestników
         </h1>
+        <UclHeaderAccent />
       </div>
 
       {/* Subtle Top 3 Podium */}

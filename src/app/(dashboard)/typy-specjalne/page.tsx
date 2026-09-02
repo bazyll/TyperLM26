@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SpecialPredictionsClient } from "@/components/specials/special-predictions-client";
 import { Star, ShieldAlert } from "lucide-react";
 import { Database } from "@/types/database.types";
+import { UclHeaderAccent } from "@/components/branding/ucl-header-accent";
 
 type TeamRow = Database["public"]["Tables"]["teams"]["Row"];
 type PlayerRow = Database["public"]["Tables"]["players"]["Row"];
@@ -31,6 +32,7 @@ export default async function SpecialPredictionsPage() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           Typy Specjalne
         </h1>
+        <UclHeaderAccent />
       </div>
 
       <div className="flex items-center gap-3 p-4 rounded-2xl bg-blue-950/40 border border-blue-500/20 text-xs text-blue-300">

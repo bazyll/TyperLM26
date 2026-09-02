@@ -8,6 +8,7 @@ import { LeagueCompletenessInfo } from "@/types";
 import { PlayerScorerAssistRankingItem } from "@/lib/goal-api/types";
 import { ScorersTable } from "./scorers-table";
 import { AssistsTable } from "./assists-table";
+import { UclHeaderAccent } from "@/components/branding/ucl-header-accent";
 
 interface UCLTableViewProps {
   table: UCLStandingRow[];
@@ -41,6 +42,7 @@ export function UCLTableView({
             ? "Klasyfikacja Strzelców"
             : "Klasyfikacja Asystentów"}
         </h1>
+        <UclHeaderAccent />
       </div>
 
       {/* Tabs Navigation */}
