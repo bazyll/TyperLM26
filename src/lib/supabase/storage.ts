@@ -87,7 +87,7 @@ export async function getAvatarSignedUrls(
     if (!error && Array.isArray(data)) {
       const pathMap = new Map<string, string>();
       data.forEach((item) => {
-        if (item.signedUrl && !item.error) {
+        if (item.signedUrl && item.path && !item.error) {
           pathMap.set(item.path, item.signedUrl);
         }
       });
