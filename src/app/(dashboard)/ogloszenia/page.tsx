@@ -2,6 +2,7 @@ import { getAnnouncementsAction } from "@/lib/announcements/actions";
 import { getCurrentUserProfile } from "@/lib/auth/actions";
 import { AnnouncementsFeed } from "@/components/announcements/announcements-feed";
 import { Bell } from "lucide-react";
+import { UclHeaderAccent } from "@/components/branding/ucl-header-accent";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function AnnouncementsPage() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           Ogłoszenia i Aktualności
         </h1>
+        <UclHeaderAccent />
       </div>
 
       <AnnouncementsFeed

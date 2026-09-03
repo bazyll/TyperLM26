@@ -40,6 +40,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UclHeaderAccent } from "@/components/branding/ucl-header-accent";
 import {
   adminCreateUserAction,
   adminUpdateUserAction,
@@ -795,6 +796,7 @@ export default function AdminPage() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           Panel Administratora TyperLM26
         </h1>
+        <UclHeaderAccent />
       </div>
 
       {/* Responsive Navigation Tabs (flex-wrap, clean layout, no horizontal scroll) */}

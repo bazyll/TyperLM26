@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bell, Pin, ChevronRight, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { UclHeaderAccent } from "@/components/branding/ucl-header-accent";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export default async function DashboardPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
               Aktualności Ligi
             </h1>
+            <UclHeaderAccent />
           </div>
 
           <Link

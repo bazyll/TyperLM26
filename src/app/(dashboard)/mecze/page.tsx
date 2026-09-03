@@ -14,6 +14,7 @@ import {
   Plus,
   Minus,
   Save,
+  Check,
   Loader2,
   Users,
 } from "lucide-react";
@@ -127,7 +128,7 @@ export default function MatchesPage() {
       } else {
         setSaveStatus((prev) => ({
           ...prev,
-          [matchId]: { type: "success", message: `Typ ${input.home}:${input.away} zapisany!` },
+          [matchId]: { type: "success", message: "Typ zapisany" },
         }));
         loadMatches();
       }
@@ -436,22 +437,23 @@ export default function MatchesPage() {
                 <div className="px-3.5 sm:px-5 py-2.5 bg-[#091120] border-t border-[#182645]/60 flex flex-wrap items-center justify-between gap-2.5">
                   {!isLocked ? (
                     <div className="flex items-center justify-between w-full gap-2">
-                      <div className="flex items-center gap-2 text-xs text-slate-400">
-                        {match.userPrediction ? (
-                          <span className="text-blue-300 font-medium text-[11px] sm:text-xs">
-                            Zapisany typ: <strong>{match.userPrediction.homeScore}:{match.userPrediction.awayScore}</strong>
+                      <div className="flex items-center gap-2">
+                        {status?.type === "error" ? (
+                          <span className="text-rose-400 text-[11px] sm:text-xs font-semibold">
+                            {status.message}
                           </span>
+                        ) : status?.message === "Zapisywanie..." ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-300 text-[11px] font-medium animate-pulse">
+                            <Loader2 className="w-3 h-3 animate-spin text-cyan-400" />
+                            <span>Zapisywanie...</span>
+                          </div>
+                        ) : (match.userPrediction || status?.type === "success") ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-semibold transition-all">
+                            <Check className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Typ zapisany</span>
+                          </div>
                         ) : (
-                          <span className="text-slate-500 italic text-[11px] sm:text-xs">Nieobstawiony</span>
-                        )}
-                        {status && (
-                          <span
-                            className={`font-semibold text-[11px] sm:text-xs ${
-                              status.type === "success" ? "text-emerald-400" : "text-red-400"
-                            }`}
-                          >
-                            • {status.message}
-                          </span>
+                          <span className="text-slate-500 italic text-[11px]">Brak typu</span>
                         )}
                       </div>
 
@@ -459,7 +461,7 @@ export default function MatchesPage() {
                         size="sm"
                         disabled={isPending}
                         onClick={() => handleSavePrediction(match.id)}
-                        className="bg-blue-600 hover:bg-blue-500 text-xs font-semibold px-3.5 h-8 rounded-xl shrink-0"
+                        className="bg-blue-600 hover:bg-blue-500 text-xs font-semibold px-3.5 h-8 rounded-xl shrink-0 cursor-pointer"
                       >
                         <Save className="w-3.5 h-3.5 mr-1" />
                         Zapisz typ

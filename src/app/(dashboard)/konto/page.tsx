@@ -17,6 +17,7 @@ import { getUserStatsAction, getLeaderboardAction, getMatchesWithPredictionsActi
 import { uploadAvatar } from "@/lib/supabase/storage";
 import { UserProfile, UserMatchStats, MatchWithTeams } from "@/types";
 import { ProfilePredictionsHistory } from "@/components/profile/profile-predictions-history";
+import { UclHeaderAccent } from "@/components/branding/ucl-header-accent";
 
 export default function AccountPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -148,6 +149,7 @@ export default function AccountPage() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
             Moje Konto
           </h1>
+          <UclHeaderAccent />
         </div>
 
         <Button

@@ -1,6 +1,7 @@
 import { getPickemDataAction } from "@/lib/pickem/actions";
 import { PickemClient } from "@/components/pickem/pickem-client";
 import { Trophy, ShieldAlert } from "lucide-react";
+import { UclHeaderAccent } from "@/components/branding/ucl-header-accent";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default async function PickemPage() {
         <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
           Pick&apos;em Tabeli Ligowej
         </h1>
+        <UclHeaderAccent />
       </div>
 
       <div className="flex items-center gap-3 p-4 rounded-2xl bg-blue-950/40 border border-blue-500/20 text-xs text-blue-300">

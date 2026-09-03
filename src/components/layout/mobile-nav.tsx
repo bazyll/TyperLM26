@@ -7,12 +7,16 @@ import {
   Trophy,
   Table,
   Target,
-  User,
+  Bell,
   Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function MobileNav() {
+interface MobileNavProps {
+  unreadCount?: number;
+}
+
+export function MobileNav({ unreadCount = 0 }: MobileNavProps) {
   const pathname = usePathname();
 
   const navItems = [
@@ -42,9 +46,9 @@ export function MobileNav() {
       icon: Target,
     },
     {
-      label: "Konto",
-      href: "/konto",
-      icon: User,
+      label: "Ogłoszenia",
+      href: "/ogloszenia",
+      icon: Bell,
     },
   ];
 
@@ -55,6 +59,8 @@ export function MobileNav() {
           const Icon = item.icon;
           const isActive =
             pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+          const isAnnouncements = item.href === "/ogloszenia";
+          const showBadge = isAnnouncements && unreadCount > 0;
 
           return (
             <Link
@@ -69,11 +75,16 @@ export function MobileNav() {
             >
               <div
                 className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-lg transition-all",
+                  "relative flex items-center justify-center w-8 h-8 rounded-lg transition-all",
                   isActive ? "bg-blue-600/20 border border-blue-500/30" : ""
                 )}
               >
                 <Icon className={cn("w-4 h-4", isActive ? "text-blue-400" : "text-slate-400")} />
+                {showBadge && (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[14px] h-3.5 px-1 rounded-full bg-blue-600 text-[9px] font-extrabold text-white border-2 border-[#070b14]">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
               </div>
               <span className="truncate">{item.label}</span>
             </Link>
