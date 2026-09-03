@@ -193,6 +193,7 @@ export interface Database {
           goal_api_fixture_id: string | null;
           is_manual_override: boolean;
           last_synced_at: string | null;
+          points_multiplier: number;
           created_at: string;
           updated_at: string;
         };
@@ -214,6 +215,7 @@ export interface Database {
           goal_api_fixture_id?: string | null;
           is_manual_override?: boolean;
           last_synced_at?: string | null;
+          points_multiplier?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -235,6 +237,7 @@ export interface Database {
           goal_api_fixture_id?: string | null;
           is_manual_override?: boolean;
           last_synced_at?: string | null;
+          points_multiplier?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -422,6 +425,7 @@ export interface Database {
           status: SpecialStatus;
           is_locked: boolean;
           locked_at: string | null;
+          points_multiplier: number;
           created_at: string;
         };
         Insert: {
@@ -431,6 +435,7 @@ export interface Database {
           status?: SpecialStatus;
           is_locked?: boolean;
           locked_at?: string | null;
+          points_multiplier?: number;
           created_at?: string;
         };
         Update: {
@@ -440,7 +445,29 @@ export interface Database {
           status?: SpecialStatus;
           is_locked?: boolean;
           locked_at?: string | null;
+          points_multiplier?: number;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      app_settings: {
+        Row: {
+          key: string;
+          value_int: number | null;
+          value_text: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          key: string;
+          value_int?: number | null;
+          value_text?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          key?: string;
+          value_int?: number | null;
+          value_text?: string | null;
+          updated_at?: string;
         };
         Relationships: [];
       };

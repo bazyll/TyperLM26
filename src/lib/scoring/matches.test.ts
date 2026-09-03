@@ -125,4 +125,54 @@ describe("Official UEFA Champions League Match Scoring Engine", () => {
 
     expect(calculateLivePoints(null, 1, 2, 1)).toBeNull();
   });
+
+  it("correctly applies points multiplier (e.g. x2, x3)", () => {
+    // Exact score with x2 multiplier -> 3 * 2 = 6 pts
+    const exactX2 = calculateMatchScore({
+      userHome: 2,
+      userAway: 1,
+      actualHome: 2,
+      actualAway: 1,
+      multiplier: 2,
+    });
+    expect(exactX2.points).toBe(6);
+    expect(exactX2.category).toBe("exact");
+
+    // Goal diff with x3 multiplier -> 2 * 3 = 6 pts
+    const diffX3 = calculateMatchScore({
+      userHome: 2,
+      userAway: 0,
+      actualHome: 3,
+      actualAway: 1,
+      multiplier: 3,
+    });
+    expect(diffX3.points).toBe(6);
+    expect(diffX3.category).toBe("diff");
+
+    // Outcome with x2 multiplier -> 1 * 2 = 2 pts
+    const outcomeX2 = calculateMatchScore({
+      userHome: 3,
+      userAway: 1,
+      actualHome: 1,
+      actualAway: 0,
+      multiplier: 2,
+    });
+    expect(outcomeX2.points).toBe(2);
+    expect(outcomeX2.category).toBe("outcome");
+
+    // Incorrect with x5 multiplier -> 0 * 5 = 0 pts
+    const incorrectX5 = calculateMatchScore({
+      userHome: 2,
+      userAway: 1,
+      actualHome: 0,
+      actualAway: 1,
+      multiplier: 5,
+    });
+    expect(incorrectX5.points).toBe(0);
+    expect(incorrectX5.category).toBe("incorrect");
+
+    // Live points with multiplier
+    const liveX2 = calculateLivePoints(2, 1, 2, 1, 2);
+    expect(liveX2?.points).toBe(6);
+  });
 });

@@ -123,4 +123,28 @@ describe("Pick'em Validation & Scoring Logic", () => {
     expect(score.firstPlaceHit).toBe(false);
     expect(score.firstPlacePoints).toBe(0);
   });
+
+  it("applies points multiplier to Pick'em scoring (e.g. x2)", () => {
+    const submission = {
+      firstTeamId: "team-1",
+      top8TeamIds: ["team-2", "team-3", "team-4", "team-5", "team-6", "team-7", "team-8"],
+      outTeamIds: [
+        "team-29",
+        "team-30",
+        "team-31",
+        "team-32",
+        "team-33",
+        "team-34",
+        "team-35",
+        "team-36",
+      ],
+    };
+
+    const scoreX2 = calculatePickemScore(submission, mock36Teams, 2);
+    expect(scoreX2.firstPlacePoints).toBe(6); // 3 * 2
+    expect(scoreX2.top8Points).toBe(42); // 21 * 2
+    expect(scoreX2.outPoints).toBe(48); // 24 * 2
+    expect(scoreX2.middlePoints).toBe(96); // 48 * 2
+    expect(scoreX2.totalPoints).toBe(192); // 96 * 2
+  });
 });

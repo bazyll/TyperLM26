@@ -91,6 +91,11 @@ export function SidebarMatches({ matches: initialMatches }: SidebarMatchesProps)
                       <span className="font-medium">{dateStr}</span>
                     </div>
 
+                    {match.pointsMultiplier && match.pointsMultiplier > 1 && (
+                      <span className="inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-extrabold bg-blue-500/20 text-cyan-300 border border-cyan-500/30">
+                        x{match.pointsMultiplier}
+                      </span>
+                    )}
                     {isLive ? (
                       <Badge variant="destructive" className="animate-pulse text-[10px] px-1.5 py-0 font-bold">
                         LIVE

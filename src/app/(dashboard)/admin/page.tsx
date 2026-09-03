@@ -34,7 +34,10 @@ import {
   Link2,
   Check,
   X,
+  Zap,
+  Radio,
 } from "lucide-react";
+import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +66,7 @@ import {
   adminSettleSpecialCategoryAction,
 } from "@/lib/specials/actions";
 import { AdminSpecialsSettlement } from "@/components/admin/admin-specials-settlement";
+import { AdminMultipliersManager } from "@/components/admin/admin-multipliers-manager";
 import {
   getPickemDataAction,
   adminUpdatePickemDeadlineAction,
@@ -109,7 +113,7 @@ type ConfigRow = Database["public"]["Tables"]["pickem_config"]["Row"];
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<
-    "matches" | "teams" | "players" | "users" | "specials" | "pickem" | "announcements" | "audit" | "export" | "goal_api"
+    "matches" | "teams" | "players" | "users" | "specials" | "pickem" | "multipliers" | "announcements" | "audit" | "export" | "goal_api"
   >("matches");
 
   // Data states
@@ -851,6 +855,18 @@ export default function AdminPage() {
         </Button>
         <Button
           size="sm"
+          variant={activeTab === "multipliers" ? "default" : "outline"}
+          onClick={() => setActiveTab("multipliers")}
+          className={`text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            activeTab === "multipliers"
+              ? "bg-blue-600 text-white shadow-sm shadow-blue-500/20 border-blue-500/40"
+              : "border-[#182645] bg-[#101d36]/60 text-slate-300 hover:text-white hover:bg-[#101d36]"
+          }`}
+        >
+          <Zap className="w-3.5 h-3.5 mr-1.5" /> Mnożniki Punktów
+        </Button>
+        <Button
+          size="sm"
           variant={activeTab === "announcements" ? "default" : "outline"}
           onClick={() => setActiveTab("announcements")}
           className={`text-xs font-semibold rounded-xl transition-all cursor-pointer ${
@@ -912,6 +928,17 @@ export default function AdminPage() {
         >
           <Globe className="w-3.5 h-3.5 mr-1.5" /> GOAL API
         </Button>
+        {process.env.ENABLE_LIVE_SANDBOX === "true" && (
+          <Link href="/admin/live-sandbox">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs font-semibold rounded-xl border-emerald-500/40 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-900/60 transition-all cursor-pointer shadow-sm"
+            >
+              <Radio className="w-3.5 h-3.5 mr-1.5 animate-pulse text-emerald-400" /> Live Sandbox
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Global Status Banner */}
@@ -1175,6 +1202,11 @@ export default function AdminPage() {
             </Button>
           </div>
         </Card>
+      )}
+
+      {/* TAB: MULTIPLIERS */}
+      {activeTab === "multipliers" && (
+        <AdminMultipliersManager />
       )}
 
       {/* TAB: ANNOUNCEMENTS */}

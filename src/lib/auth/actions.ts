@@ -25,6 +25,84 @@ type AuditLogRow = Database["public"]["Tables"]["audit_logs"]["Row"];
 // AUTHENTICATION & SESSION ACTIONS
 // ============================================================================
 
+function extractSupabaseProjectRef(url: string): string {
+  const m = url.match(/https:\/\/([^.]+)\.supabase\.co/);
+  return m ? m[1] : "unknown";
+}
+
+/**
+ * Pure authentication helper for login workflow (used by Server Action & verification)
+ */
+export async function authenticateByUsername(
+  username: string,
+  password: string,
+  clientIp: string = "127.0.0.1",
+  options: {
+    adminSupabase?: ReturnType<typeof createAdminClient>;
+    serverSupabase?: Awaited<ReturnType<typeof createClient>>;
+  } = {}
+): Promise<{ success: boolean; error?: string; userId?: string }> {
+  const normalizedUsername = username.toLowerCase().trim();
+  const adminSupabase = options.adminSupabase || createAdminClient();
+  const serverSupabase = options.serverSupabase || (await createClient());
+
+  // 1. Atomic Rate Limiting in PostgreSQL with Auto-Cleanup
+  const { data: rateLimitResult, error: rateLimitError } = await adminSupabase.rpc(
+    "check_and_record_login_attempt",
+    {
+      p_ip: clientIp,
+      p_username: normalizedUsername,
+      p_max_attempts: 5,
+      p_window_seconds: 60,
+    }
+  );
+
+  if (!rateLimitError && rateLimitResult && rateLimitResult[0] && !rateLimitResult[0].is_allowed) {
+    const waitSeconds = rateLimitResult[0].remaining_seconds || 60;
+    return {
+      success: false,
+      error: `Zbyt wiele nieudanych prób logowania. Odczekaj ${waitSeconds}s przed kolejną próbą.`,
+    };
+  }
+
+  // 2. Lookup private auth mapping (auth_mappings)
+  const { data: mapping, error: mapError } = await adminSupabase
+    .from("auth_mappings")
+    .select("user_id, auth_email")
+    .eq("username", normalizedUsername)
+    .maybeSingle();
+
+  if (mapError || !mapping) {
+    return { success: false, error: "Nieprawidłowy login lub hasło." };
+  }
+
+  // 3. Verify user active status in profiles (Defence in depth)
+  const { data: profile, error: profError } = await adminSupabase
+    .from("profiles")
+    .select("id, is_active, role")
+    .eq("id", mapping.user_id)
+    .maybeSingle();
+
+  if (profError || !profile || !profile.is_active) {
+    return { success: false, error: "Nieprawidłowy login lub hasło." };
+  }
+
+  // 4. Perform Supabase Auth login using internal auth_email
+  const { data: authData, error: authError } = await serverSupabase.auth.signInWithPassword({
+    email: mapping.auth_email,
+    password: password,
+  });
+
+  if (authError || !authData.session) {
+    return { success: false, error: "Nieprawidłowy login lub hasło." };
+  }
+
+  // 5. Success: clear failed attempts
+  await adminSupabase.from("login_attempts").delete().eq("username", normalizedUsername);
+
+  return { success: true, userId: mapping.user_id };
+}
+
 /**
  * Server Action: Login with Username and Password
  */
@@ -40,13 +118,7 @@ export async function loginWithUsernameAction(
     return { success: false, error: "Wprowadź login i hasło." };
   }
 
-  const normalizedUsername = rawUsername.toLowerCase();
-
   try {
-    const adminSupabase = createAdminClient();
-    const serverSupabase = await createClient();
-
-    // Extract trusted IP on Vercel infrastructure (x-vercel-forwarded-for) with local fallback
     const headerList = await headers();
     const clientIp =
       headerList.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
@@ -54,60 +126,14 @@ export async function loginWithUsernameAction(
       headerList.get("x-real-ip") ||
       "127.0.0.1";
 
-    // 1. Atomic Rate Limiting in PostgreSQL with Auto-Cleanup
-    const { data: rateLimitResult, error: rateLimitError } = await adminSupabase.rpc(
-      "check_and_record_login_attempt",
-      {
-        p_ip: clientIp,
-        p_username: normalizedUsername,
-        p_max_attempts: 5,
-        p_window_seconds: 60,
-      }
-    );
-
-    if (!rateLimitError && rateLimitResult && rateLimitResult[0] && !rateLimitResult[0].is_allowed) {
-      const waitSeconds = rateLimitResult[0].remaining_seconds || 60;
-      return {
-        success: false,
-        error: `Zbyt wiele nieudanych prób logowania. Odczekaj ${waitSeconds}s przed kolejną próbą.`,
-      };
+    const result = await authenticateByUsername(rawUsername, rawPassword, clientIp);
+    if (!result.success) {
+      return { success: false, error: result.error || "Nieprawidłowy login lub hasło." };
     }
-
-    // 2. Lookup private auth mapping (auth_mappings)
-    const { data: mapping, error: mapError } = await adminSupabase
-      .from("auth_mappings")
-      .select("user_id, auth_email")
-      .eq("username", normalizedUsername)
-      .maybeSingle();
-
-    if (mapError || !mapping) {
-      return { success: false, error: "Nieprawidłowy login lub hasło." };
+  } catch (err: any) {
+    if (err.message === "NEXT_REDIRECT" || err.digest?.startsWith("NEXT_REDIRECT")) {
+      throw err;
     }
-
-    // 3. Verify user active status in profiles (Defence in depth)
-    const { data: profile, error: profError } = await adminSupabase
-      .from("profiles")
-      .select("id, is_active")
-      .eq("id", mapping.user_id)
-      .maybeSingle();
-
-    if (profError || !profile || !profile.is_active) {
-      return { success: false, error: "Nieprawidłowy login lub hasło." };
-    }
-
-    // 4. Perform Supabase Auth login using internal auth_email
-    const { error: authError } = await serverSupabase.auth.signInWithPassword({
-      email: mapping.auth_email,
-      password: rawPassword,
-    });
-
-    if (authError) {
-      return { success: false, error: "Nieprawidłowy login lub hasło." };
-    }
-
-    // 5. Success: clear failed attempts
-    await adminSupabase.from("login_attempts").delete().eq("username", normalizedUsername);
-  } catch (err) {
     console.error("Login unexpected error:", err);
     return { success: false, error: "Nieprawidłowy login lub hasło." };
   }

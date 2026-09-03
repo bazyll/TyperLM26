@@ -10,8 +10,8 @@ import {
   Target,
   Bell,
 } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { UclBrandMark } from "@/components/branding/ucl-brand-mark";
 
 interface SidebarProps {
   unreadCount?: number;
@@ -59,14 +59,16 @@ export function Sidebar({ unreadCount = 0 }: SidebarProps) {
   return (
     <aside className="hidden lg:flex flex-col w-64 shrink-0 min-h-screen bg-[#070b14] border-r border-[#182645] p-5 select-none relative z-20">
       <div className="flex flex-col gap-8">
-        {/* Brand Logo with UCL Starball Mark */}
-        <Link href="/" className="flex items-center gap-3 px-2 group">
-          <UclBrandMark size={38} className="group-hover:scale-105 transition-transform" />
-          <div className="flex items-baseline gap-1">
-            <span className="text-xl font-bold tracking-tight text-white">
-              Typer<span className="text-blue-500 font-extrabold">LM26</span>
-            </span>
-          </div>
+        {/* Brand Logo */}
+        <Link href="/" className="flex items-center px-1 group">
+          <Image
+            src="/logo.png"
+            alt="TyperLM26"
+            width={220}
+            height={54}
+            className="h-[54px] w-auto max-w-[216px] object-contain group-hover:scale-105 transition-transform"
+            priority
+          />
         </Link>
 
         {/* Navigation Menu */}

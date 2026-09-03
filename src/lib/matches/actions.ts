@@ -383,7 +383,7 @@ export async function getMatchesWithPredictionsAction(): Promise<MatchWithTeams[
 
     const allPredictions = matchPreds.map((p) => {
       const livePts = m.status === "live"
-        ? calculateLivePoints(p.home_score, p.away_score, m.home_score, m.away_score)?.points || 0
+        ? calculateLivePoints(p.home_score, p.away_score, m.home_score, m.away_score, m.points_multiplier || 1)?.points || 0
         : (p.points_awarded ?? 0);
 
       const prof = p.profile as ProfileRow | undefined;
@@ -413,6 +413,7 @@ export async function getMatchesWithPredictionsAction(): Promise<MatchWithTeams[
       homeScore: m.home_score,
       awayScore: m.away_score,
       liveMinute: m.live_minute,
+      pointsMultiplier: m.points_multiplier ?? 1,
       homeTeam: {
         id: m.home_team.id,
         name: m.home_team.name,
@@ -691,4 +692,176 @@ export async function getAllTeamsAction(): Promise<TeamRow[]> {
   const supabase = await createClient();
   const { data: rawTeams } = await supabase.from("teams").select("*").order("name", { ascending: true });
   return (rawTeams || []) as unknown as TeamRow[];
+}
+
+/**
+ * Server Action: Get current system multipliers for Matches and Pick'em.
+ */
+export async function adminGetMultipliersAction(): Promise<{
+  matchMultiplier: number;
+  pickemMultiplier: number;
+  futureMatchesCount: number;
+}> {
+  const supabase = await createClient();
+
+  const [{ data: rawSettings }, { data: rawPickemConfig }, { count: futureCount }] = await Promise.all([
+    supabase.from("app_settings").select("*"),
+    supabase.from("pickem_config").select("points_multiplier").maybeSingle(),
+    supabase
+      .from("matches")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "scheduled")
+      .gt("kickoff_at", new Date().toISOString())
+      .eq("is_betting_locked", false),
+  ]);
+
+  const settings = (rawSettings || []) as Array<{ key: string; value_int: number | null }>;
+  const matchSetting = settings.find((s) => s.key === "default_match_multiplier");
+  const matchMultiplier = matchSetting?.value_int || 1;
+
+  const pickemConfig = rawPickemConfig as { points_multiplier?: number } | null;
+  const pickemMultiplier = pickemConfig?.points_multiplier || 1;
+
+  return {
+    matchMultiplier,
+    pickemMultiplier,
+    futureMatchesCount: futureCount || 0,
+  };
+}
+
+/**
+ * Server Action: Admin updates the global match multiplier and updates safe future fixtures.
+ */
+export async function adminUpdateMatchMultiplierAction(input: {
+  multiplier: number;
+}): Promise<ActionResult> {
+  const admin = await requireAdminRole();
+  const parsed = z.object({ multiplier: z.number().int().min(1).max(10) }).safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Mnożnik musi być liczbą całkowitą od 1 do 10." };
+  }
+
+  const { multiplier } = parsed.data;
+  const adminSupabase = createAdminClient();
+
+  try {
+    // 1. Update default setting
+    await adminSupabase.from("app_settings").upsert({
+      key: "default_match_multiplier",
+      value_int: multiplier,
+      updated_at: new Date().toISOString(),
+    });
+
+    // 2. Update safe future scheduled matches ONLY
+    const { data: updatedMatches, error: updateError } = await adminSupabase
+      .from("matches")
+      .update({
+        points_multiplier: multiplier,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("status", "scheduled")
+      .gt("kickoff_at", new Date().toISOString())
+      .eq("is_betting_locked", false)
+      .select("id");
+
+    if (updateError) throw updateError;
+
+    // 3. Log to audit
+    await adminSupabase.from("audit_logs").insert({
+      actor_id: admin.id,
+      action: "MATCH_MULTIPLIER_UPDATED",
+      target_type: "matches",
+      details: {
+        newMultiplier: multiplier,
+        affectedMatchesCount: updatedMatches?.length || 0,
+      },
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/mecze");
+    revalidatePath("/");
+    return { success: true };
+  } catch (err) {
+    console.error("Error updating match multiplier:", err);
+    return { success: false, error: "Nie udało się zaktualizować mnożnika meczów." };
+  }
+}
+
+/**
+ * Server Action: Admin updates the Pick'em multiplier.
+ */
+export async function adminUpdatePickemMultiplierAction(input: {
+  multiplier: number;
+}): Promise<ActionResult> {
+  const admin = await requireAdminRole();
+  const parsed = z.object({ multiplier: z.number().int().min(1).max(10) }).safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: "Mnożnik musi być liczbą całkowitą od 1 do 10." };
+  }
+
+  const { multiplier } = parsed.data;
+  const adminSupabase = createAdminClient();
+
+  try {
+    // 1. Update pickem_config points_multiplier only if genuinely open (not locked, deadline not passed, status open)
+    const { data: rawConfig } = await adminSupabase
+      .from("pickem_config")
+      .select("id, status, is_locked, deadline_at, points_multiplier")
+      .maybeSingle();
+
+    const config = rawConfig as {
+      id: string;
+      status: string;
+      is_locked: boolean;
+      deadline_at: string;
+      points_multiplier: number;
+    } | null;
+
+    if (!config) {
+      return { success: false, error: "Brak konfiguracji Pick'em." };
+    }
+
+    const isPassed = new Date(config.deadline_at).getTime() <= Date.now();
+    if (config.is_locked || isPassed || config.status !== "open") {
+      return {
+        success: false,
+        error: "Nie można zmienić mnożnika dla zamkniętej, zablokowanej lub rozliczonej edycji Pick'em.",
+      };
+    }
+
+    const { error: updateError } = await adminSupabase
+      .from("pickem_config")
+      .update({
+        points_multiplier: multiplier,
+      })
+      .eq("id", config.id);
+
+    if (updateError) throw updateError;
+
+    // 2. Also update app_settings for future pickem default
+    await adminSupabase.from("app_settings").upsert({
+      key: "default_pickem_multiplier",
+      value_int: multiplier,
+      updated_at: new Date().toISOString(),
+    });
+
+    // 3. Log to audit
+    await adminSupabase.from("audit_logs").insert({
+      actor_id: admin.id,
+      action: "PICKEM_MULTIPLIER_UPDATED",
+      target_type: "pickem_config",
+      target_id: config.id,
+      details: {
+        oldMultiplier: config.points_multiplier,
+        newMultiplier: multiplier,
+      },
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/pickem");
+    return { success: true };
+  } catch (err) {
+    console.error("Error updating pickem multiplier:", err);
+    return { success: false, error: "Nie udało się zaktualizować mnożnika Pick'em." };
+  }
 }

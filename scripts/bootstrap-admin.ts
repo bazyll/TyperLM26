@@ -2,6 +2,9 @@ import { createClient } from "@supabase/supabase-js";
 import { Database } from "../src/types/database.types";
 import { config } from "dotenv";
 
+if (process.env.APP_ENV === "staging" || process.env.STAGING === "true") {
+  config({ path: ".env.staging.local" });
+}
 config({ path: ".env.local" });
 config({ path: ".env" });
 

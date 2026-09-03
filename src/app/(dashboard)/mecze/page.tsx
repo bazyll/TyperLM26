@@ -305,8 +305,14 @@ export default function MatchesPage() {
                     </span>
                   </div>
 
-                  {/* Status Badge */}
-                  <div className="shrink-0 ml-2">
+                  {/* Status & Multiplier Badges */}
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    {match.pointsMultiplier && match.pointsMultiplier > 1 && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-cyan-300 border border-cyan-500/30">
+                        x{match.pointsMultiplier} PUNKTY
+                      </span>
+                    )}
+
                     {isLive ? (
                       <Badge variant="destructive" className="animate-pulse flex items-center gap-1 font-bold text-[10px] sm:text-xs py-0.5 px-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-white" />

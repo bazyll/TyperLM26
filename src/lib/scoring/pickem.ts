@@ -89,23 +89,26 @@ export function validatePickemSubmission(
  */
 export function calculatePickemScore(
   submission: PickemSubmissionInput,
-  finalStandings: string[]
+  finalStandings: string[],
+  multiplier: number = 1
 ): PickemDetailedScore {
   if (finalStandings.length < 36) {
     throw new Error(`Standings must contain 36 teams, got ${finalStandings.length}`);
   }
+
+  const mult = Math.max(1, Math.min(10, Math.floor(multiplier || 1)));
 
   const teamToRank = new Map<string, number>();
   finalStandings.forEach((teamId, index) => {
     teamToRank.set(teamId, index + 1); // 1 to 36
   });
 
-  // 1. FIRST place check (must be rank 1) -> 3 pts
+  // 1. FIRST place check (must be rank 1) -> 3 pts base
   const firstRank = teamToRank.get(submission.firstTeamId);
   const firstPlaceHit = firstRank === 1;
-  const firstPlacePoints = firstPlaceHit ? 3 : 0;
+  const firstPlacePoints = (firstPlaceHit ? 3 : 0) * mult;
 
-  // 2. TOP 8 check (7 chosen teams must end in rank 1..8) -> 3 pts each
+  // 2. TOP 8 check (7 chosen teams must end in rank 1..8) -> 3 pts base each
   let top8HitsCount = 0;
   for (const teamId of submission.top8TeamIds) {
     const rank = teamToRank.get(teamId);
@@ -113,9 +116,9 @@ export function calculatePickemScore(
       top8HitsCount += 1;
     }
   }
-  const top8Points = top8HitsCount * 3;
+  const top8Points = top8HitsCount * 3 * mult;
 
-  // 3. OUT check (8 chosen teams must end in rank 25..36) -> 3 pts each
+  // 3. OUT check (8 chosen teams must end in rank 25..36) -> 3 pts base each
   let outHitsCount = 0;
   for (const teamId of submission.outTeamIds) {
     const rank = teamToRank.get(teamId);
@@ -123,9 +126,9 @@ export function calculatePickemScore(
       outHitsCount += 1;
     }
   }
-  const outPoints = outHitsCount * 3;
+  const outPoints = outHitsCount * 3 * mult;
 
-  // 4. MIDDLE check (all remaining 20 teams must end in rank 9..24) -> 3 pts each
+  // 4. MIDDLE check (all remaining 20 teams must end in rank 9..24) -> 3 pts base each
   const chosenExplicitly = new Set<string>([
     submission.firstTeamId,
     ...submission.top8TeamIds,
@@ -141,7 +144,7 @@ export function calculatePickemScore(
       }
     }
   }
-  const middlePoints = middleHitsCount * 3;
+  const middlePoints = middleHitsCount * 3 * mult;
 
   const totalPoints = firstPlacePoints + top8Points + outPoints + middlePoints;
 

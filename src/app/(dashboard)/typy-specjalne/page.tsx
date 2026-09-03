@@ -13,14 +13,18 @@ export const dynamic = "force-dynamic";
 export default async function SpecialPredictionsPage() {
   const supabase = await createClient();
 
-  const [categories, { data: rawTeams }, { data: rawPlayers }] = await Promise.all([
+  const [categories, { data: rawTeams }, { data: rawPlayers }, { data: rawSetting }] = await Promise.all([
     getSpecialCategoriesWithPredictionsAction(),
     supabase.from("teams").select("*").order("name", { ascending: true }),
     supabase.from("players").select("*").eq("is_active", true).order("name", { ascending: true }),
+    supabase.from("app_settings").select("value_int").eq("key", "uefa_squads_reconciliation_complete").maybeSingle(),
   ]);
 
   const teams = (rawTeams || []) as unknown as TeamRow[];
   const players = (rawPlayers || []) as unknown as PlayerRow[];
+  const isUefaReconciliationComplete = Boolean(
+    (rawSetting as { value_int?: number | null } | null)?.value_int === 1
+  );
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
@@ -46,6 +50,7 @@ export default async function SpecialPredictionsPage() {
         initialCategories={categories}
         teams={teams}
         players={players}
+        isUefaReconciliationComplete={isUefaReconciliationComplete}
       />
     </div>
   );

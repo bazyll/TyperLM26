@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { loginWithUsernameAction } from "@/lib/auth/actions";
 import { ActionResult } from "@/lib/auth/schemas";
+import Image from "next/image";
 import { UclStarballBackground } from "@/components/branding/ucl-starball-background";
-import { UclBrandMark } from "@/components/branding/ucl-brand-mark";
 
 const initialState: ActionResult = {
   success: false,
@@ -28,11 +28,15 @@ export default function LoginPage() {
       <div className="w-full max-w-md relative z-10 flex flex-col gap-6">
         {/* Logo Header */}
         <div className="flex flex-col items-center text-center gap-2">
-          <UclBrandMark size={56} className="shadow-2xl shadow-blue-500/40" />
-          <h1 className="text-2xl font-bold text-white tracking-tight mt-2">
-            Typer<span className="text-blue-500 font-extrabold">LM26</span>
-          </h1>
-          <p className="text-xs text-slate-400">
+          <Image
+            src="/logo.png"
+            alt="TyperLM26"
+            width={240}
+            height={56}
+            className="h-14 w-auto max-w-[240px] object-contain drop-shadow-[0_8px_16px_rgba(37,99,235,0.3)]"
+            priority
+          />
+          <p className="text-xs text-slate-400 mt-1">
             Prywatna liga typowania UEFA Champions League 2026/2027
           </p>
         </div>

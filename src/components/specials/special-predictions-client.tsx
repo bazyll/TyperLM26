@@ -29,6 +29,7 @@ interface Props {
   initialCategories: SpecialCategoryWithPrediction[];
   teams: TeamRow[];
   players: PlayerRow[];
+  isUefaReconciliationComplete?: boolean;
 }
 
 const CATEGORY_ICONS: Record<string, typeof Trophy> = {
@@ -36,12 +37,21 @@ const CATEGORY_ICONS: Record<string, typeof Trophy> = {
   finalist: Award,
   top_scorer: Flame,
   top_assists: Zap,
-  most_goals: Target,
-  clean_sheets: ShieldCheck,
+  team_most_goals: Target,
+  team_most_clean_sheets: ShieldCheck,
 };
 
-export function SpecialPredictionsClient({ initialCategories, teams, players }: Props) {
+export function SpecialPredictionsClient({
+  initialCategories,
+  teams,
+  players,
+  isUefaReconciliationComplete = false,
+}: Props) {
   const [categories, setCategories] = useState<SpecialCategoryWithPrediction[]>(initialCategories);
+
+  // Player categories are ready ONLY when explicit UEFA squad reconciliation is confirmed complete
+  const arePlayerCategoriesReady = Boolean(isUefaReconciliationComplete);
+
   const [selections, setSelections] = useState<Record<string, { teamId?: string; playerId?: string }>>(() => {
     const init: Record<string, { teamId?: string; playerId?: string }> = {};
     initialCategories.forEach((c) => {
@@ -88,7 +98,11 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
   const handleSaveAll = async () => {
     setIsSaving(true);
     const payload = Object.entries(selections)
-      .filter(([_, sel]) => sel.teamId || sel.playerId)
+      .filter(([catId, sel]) => {
+        const cat = categories.find((c) => c.id === catId);
+        const isReady = cat?.targetType === "player" ? arePlayerCategoriesReady : teams.length >= 36;
+        return isReady && (sel.teamId || sel.playerId);
+      })
       .map(([catId, sel]) => ({
         categoryId: catId,
         selectedTeamId: sel.teamId,
@@ -132,6 +146,7 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {categories.map((cat) => {
           const Icon = CATEGORY_ICONS[cat.slug] || Trophy;
+          const isReady = cat.targetType === "player" ? arePlayerCategoriesReady : teams.length >= 36;
           const isPassed = new Date(cat.deadlineAt).getTime() <= Date.now() || cat.isLocked;
           const isSettled = cat.status === "settled";
           const currentSel = selections[cat.id];
@@ -143,7 +158,11 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
           return (
             <div
               key={cat.id}
-              className="group relative flex flex-col justify-between p-5 rounded-2xl bg-slate-900/80 border border-slate-800 hover:border-slate-700/80 transition-all shadow-lg hover:shadow-xl backdrop-blur-sm"
+              className={`group relative flex flex-col justify-between p-5 rounded-2xl transition-all shadow-lg backdrop-blur-sm ${
+                !isReady
+                  ? "bg-[#080d19]/90 border border-[#182645]/40 opacity-60"
+                  : "bg-slate-900/80 border border-slate-800 hover:border-slate-700/80 hover:shadow-xl"
+              }`}
             >
               {/* Header: Icon, Title, Points, Status */}
               <div>
@@ -159,7 +178,11 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
                   </div>
 
                   {/* Status Badge */}
-                  {isSettled ? (
+                  {!isReady ? (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700/60 uppercase">
+                      Wkrótce
+                    </span>
+                  ) : isSettled ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
                       Rozliczone
                     </span>
@@ -191,7 +214,13 @@ export function SpecialPredictionsClient({ initialCategories, teams, players }: 
                     )}
                   </div>
 
-                  {isPassed ? (
+                  {!isReady ? (
+                    /* Unready (Waiting for UEFA) View */
+                    <div className="flex items-center gap-2.5 p-3 rounded-xl bg-slate-950/40 border border-slate-800/60 text-slate-500 text-xs font-semibold select-none cursor-not-allowed">
+                      <Clock className="w-4 h-4 text-slate-500 shrink-0" />
+                      <span>Oczekiwanie na oficjalne składy UEFA</span>
+                    </div>
+                  ) : isPassed ? (
                     /* Locked View */
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950/60 border border-slate-800">
                       {selectedTeam ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronDown, User, LogOut, Shield } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -40,13 +41,15 @@ export function Header({
     <header className="sticky top-0 z-40 flex items-center justify-between h-18 px-4 sm:px-8 bg-[#070b14]/80 backdrop-blur-md border-b border-[#182645]/60">
       {/* Left side: Mobile Brand */}
       <div className="flex items-center gap-3 lg:hidden">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm shadow-md shadow-blue-600/30">
-            ⚽
-          </div>
-          <span className="text-lg font-bold text-white">
-            Typer<span className="text-blue-500">LM26</span>
-          </span>
+        <Link href="/" className="flex items-center py-1">
+          <Image
+            src="/logo.png"
+            alt="TyperLM26"
+            width={160}
+            height={40}
+            className="h-10 w-auto max-w-[170px] object-contain"
+            priority
+          />
         </Link>
       </div>
 

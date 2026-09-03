@@ -13,6 +13,7 @@ dist/
 .env.test.local
 .env.production.local
 *.pem
+.env.staging.local
 
 # Supabase CLI Temporary
 supabase/.temp/

@@ -31,6 +31,7 @@ export interface MatchWithTeams {
   homeScore: number | null;
   awayScore: number | null;
   liveMinute: number | null;
+  pointsMultiplier?: number;
   homeTeam: {
     id: string;
     name: string;
