@@ -46,9 +46,12 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/icons") ||
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon.ico");
+    pathname === "/favicon.ico" ||
+    pathname === "/logo.png" ||
+    pathname === "/icon.png" ||
+    pathname === "/apple-icon.png";
 
-  if (!user && !isPublicRoute && pathname !== "/") {
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);

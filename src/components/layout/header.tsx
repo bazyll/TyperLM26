@@ -15,7 +15,7 @@ import {
 import { logoutAction } from "@/lib/auth/actions";
 
 interface HeaderProps {
-  user?: {
+  user: {
     username: string;
     firstName: string;
     lastName: string;
@@ -25,17 +25,8 @@ interface HeaderProps {
   };
 }
 
-export function Header({
-  user = {
-    username: "bartosz",
-    firstName: "Bartosz",
-    lastName: "Kowalski",
-    avatarUrl: null,
-    role: "admin",
-    points: 1250,
-  },
-}: HeaderProps) {
-  const initials = `${user.firstName[0] || "U"}${user.lastName[0] || ""}`;
+export function Header({ user }: HeaderProps) {
+  const initials = `${user.firstName?.[0] || "U"}${user.lastName?.[0] || ""}`;
 
   return (
     <header className="sticky top-0 z-40 flex items-center justify-between h-18 px-4 sm:px-8 bg-[#070b14]/80 backdrop-blur-md border-b border-[#182645]/60">

@@ -199,7 +199,7 @@ export default function AccountPage() {
               <div className="flex-1 flex flex-col items-center sm:items-start text-center sm:text-left gap-2">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
                   <h2 className="text-2xl sm:text-3xl font-extrabold text-white">
-                    {profile ? `${profile.firstName} ${profile.lastName}` : "Bartosz"}
+                    {profile ? `${profile.firstName} ${profile.lastName}` : "Profil"}
                   </h2>
                   {profile?.role === "admin" && (
                     <Badge variant="default" className="gap-1">

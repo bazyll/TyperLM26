@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
@@ -18,25 +19,19 @@ export default async function DashboardLayout({
     getUnreadAnnouncementsCountAction(),
   ]);
 
-  const userProp = currentUser
-    ? {
-        id: currentUser.id,
-        username: currentUser.username,
-        firstName: currentUser.firstName,
-        lastName: currentUser.lastName,
-        avatarUrl: currentUser.avatarUrl,
-        role: currentUser.role,
-        points: currentUser.points,
-      }
-    : {
-        id: "demo-id",
-        username: "bartosz",
-        firstName: "Bartosz",
-        lastName: "Kowalski",
-        avatarUrl: null,
-        role: "admin" as const,
-        points: 1250,
-      };
+  if (!currentUser) {
+    redirect("/login");
+  }
+
+  const userProp = {
+    id: currentUser.id,
+    username: currentUser.username,
+    firstName: currentUser.firstName,
+    lastName: currentUser.lastName,
+    avatarUrl: currentUser.avatarUrl,
+    role: currentUser.role,
+    points: currentUser.points,
+  };
 
   return (
     <div className="flex min-h-screen bg-[#070b14] relative">

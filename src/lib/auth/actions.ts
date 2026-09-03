@@ -520,13 +520,26 @@ export async function adminUpdateUserAction(input: z.infer<typeof updateUserSche
       })
       .eq("id", userId);
 
-    if (updateProfErr) throw updateProfErr;
+    if (updateProfErr) {
+      console.error("[ADMIN UPDATE USER] profiles.update failed:", {
+        code: updateProfErr.code,
+        message: updateProfErr.message,
+        details: updateProfErr.details,
+        hint: updateProfErr.hint,
+      });
+      throw updateProfErr;
+    }
 
-    // Update auth_mappings
-    await adminSupabase
-      .from("auth_mappings")
-      .update({ username: normalizedUsername })
-      .eq("user_id", userId);
+    // Update auth_mappings (if username changed)
+    if (normalizedUsername !== targetProfile.username.toLowerCase()) {
+      const { error: mapErr } = await adminSupabase
+        .from("auth_mappings")
+        .update({ username: normalizedUsername })
+        .eq("user_id", userId);
+      if (mapErr) {
+        console.warn("[ADMIN UPDATE USER] auth_mappings update notice:", mapErr.message);
+      }
+    }
 
     // Optional auth ban/unban in Supabase Auth to prevent re-login
     if (isActive !== targetProfile.is_active) {
@@ -536,25 +549,34 @@ export async function adminUpdateUserAction(input: z.infer<typeof updateUserSche
         } else {
           await adminSupabase.auth.admin.updateUserById(userId, { ban_duration: "none" });
         }
-      } catch (banErr) {
-        console.warn("Auth ban/unban notice:", banErr);
+      } catch (banErr: any) {
+        console.warn("[ADMIN UPDATE USER] Auth ban/unban notice:", banErr?.message || banErr);
       }
     }
 
-    // Audit log
-    await adminSupabase.from("audit_logs").insert({
-      actor_id: admin.id,
-      action: isActive !== targetProfile.is_active ? (isActive ? "USER_REACTIVATED" : "USER_DEACTIVATED") : "USER_UPDATED",
-      target_type: "user",
-      target_id: userId,
-      details: { username: normalizedUsername, firstName, lastName, isActive },
-    });
+    // Audit log (resilient non-blocking)
+    try {
+      await adminSupabase.from("audit_logs").insert({
+        actor_id: admin.id,
+        action: isActive !== targetProfile.is_active ? (isActive ? "USER_REACTIVATED" : "USER_DEACTIVATED") : "USER_UPDATED",
+        target_type: "user",
+        target_id: userId,
+        details: { username: normalizedUsername, firstName, lastName, isActive },
+      });
+    } catch (auditErr: any) {
+      console.warn("[ADMIN UPDATE USER] audit_logs insert notice:", auditErr?.message || auditErr);
+    }
 
     revalidatePath("/admin");
     return { success: true };
-  } catch (err) {
-    console.error("Error updating user by admin:", err);
-    return { success: false, error: "Wystąpił błąd podczas aktualizacji użytkownika." };
+  } catch (err: any) {
+    console.error("[ADMIN UPDATE USER ERROR]:", {
+      code: err?.code,
+      message: err?.message,
+      details: err?.details,
+      hint: err?.hint,
+    });
+    return { success: false, error: err?.message || "Wystąpił błąd podczas aktualizacji użytkownika." };
   }
 }
 
@@ -596,21 +618,38 @@ export async function adminToggleRoleAction(userId: string, newRole: "user" | "a
       .update({ role: newRole, updated_at: new Date().toISOString() })
       .eq("id", userId);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error("[ADMIN TOGGLE ROLE] profiles.update failed:", {
+        code: updateError.code,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint,
+      });
+      throw updateError;
+    }
 
-    await adminSupabase.from("audit_logs").insert({
-      actor_id: admin.id,
-      action: newRole === "admin" ? "ROLE_GRANTED_ADMIN" : "ROLE_REVOKED_ADMIN",
-      target_type: "user",
-      target_id: userId,
-      details: { username: targetProfile.username, oldRole: targetProfile.role, newRole },
-    });
+    try {
+      await adminSupabase.from("audit_logs").insert({
+        actor_id: admin.id,
+        action: newRole === "admin" ? "ROLE_GRANTED_ADMIN" : "ROLE_REVOKED_ADMIN",
+        target_type: "user",
+        target_id: userId,
+        details: { username: targetProfile.username, oldRole: targetProfile.role, newRole },
+      });
+    } catch (auditErr: any) {
+      console.warn("[ADMIN TOGGLE ROLE] audit_logs insert notice:", auditErr?.message || auditErr);
+    }
 
     revalidatePath("/admin");
     return { success: true };
-  } catch (err) {
-    console.error("Error toggling role:", err);
-    return { success: false, error: "Wystąpił błąd podczas zmiany roli." };
+  } catch (err: any) {
+    console.error("[ADMIN TOGGLE ROLE ERROR]:", {
+      code: err?.code,
+      message: err?.message,
+      details: err?.details,
+      hint: err?.hint,
+    });
+    return { success: false, error: err?.message || "Wystąpił błąd podczas zmiany roli." };
   }
 }
 
