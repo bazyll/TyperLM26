@@ -261,13 +261,19 @@ export async function adminUpdatePickemDeadlineAction(
     const config = rawConfig as unknown as ConfigRow | null;
     if (!config) return { success: false, error: "Brak konfiguracji Pick'em." };
 
-    if (new Date(config.deadline_at).getTime() <= Date.now() || config.is_locked) {
-      return { success: false, error: "Nie można przedłużyć deadline'u po jego upłynięciu (ochrona fair play)." };
+    if (config.status === "settled") {
+      return { success: false, error: "Nie można zmienić deadline'u dla rozliczonej edycji Pick'em." };
     }
+
+    const isFuture = new Date(deadlineAt).getTime() > Date.now();
 
     const { error } = await adminSupabase
       .from("pickem_config")
-      .update({ deadline_at: deadlineAt })
+      .update({
+        deadline_at: deadlineAt,
+        is_locked: isFuture ? false : config.is_locked,
+        locked_at: isFuture ? null : config.locked_at,
+      })
       .eq("id", config.id);
 
     if (error) throw error;

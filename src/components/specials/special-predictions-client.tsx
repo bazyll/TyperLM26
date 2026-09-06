@@ -472,8 +472,15 @@ export function SpecialPredictionsClient({
               ) : (
                 /* Players List */
                 players
-                  .filter((p) => p.is_ucl_registered || selections[activeCategory.id]?.playerId === p.id)
-                  .filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                  .filter((p) => p.is_active !== false)
+                  .filter((p) => {
+                    const q = searchQuery.toLowerCase().trim();
+                    if (!q) return true;
+                    const matchesName = p.name.toLowerCase().includes(q);
+                    const pTeam = teamMap.get(p.team_id);
+                    const matchesTeam = pTeam?.name.toLowerCase().includes(q) || pTeam?.short_name.toLowerCase().includes(q);
+                    return matchesName || Boolean(matchesTeam);
+                  })
                   .map((player) => {
                     const isSelected = selections[activeCategory.id]?.playerId === player.id;
                     const pTeam = teamMap.get(player.team_id);
