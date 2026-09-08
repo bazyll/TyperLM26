@@ -3,7 +3,10 @@
 import { useState, useMemo } from "react";
 import { Database } from "@/types/database.types";
 import { PickemSubmissionWithDetails } from "@/types";
-import { savePickemSubmissionAction } from "@/lib/pickem/actions";
+import {
+  savePickemSubmissionAction,
+  correctLegacyPickemSubmissionAction,
+} from "@/lib/pickem/actions";
 import {
   Trophy,
   Shield,
@@ -14,6 +17,7 @@ import {
   Sparkles,
   Users,
   Loader2,
+  AlertTriangle,
   ChevronRight,
 } from "lucide-react";
 import { TeamLogo } from "@/components/team-logo";
@@ -35,6 +39,10 @@ interface Props {
     firstTeamId?: string;
     top8TeamIds?: string[];
     outTeamIds?: string[];
+    outCount?: number;
+    middleCount?: number;
+    isComplete?: boolean;
+    isLegacyIncomplete?: boolean;
   }>;
 }
 
@@ -49,6 +57,15 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
 
   const isPassed = Boolean(config && (new Date(config.deadline_at).getTime() <= Date.now() || config.is_locked));
   const isSettled = config?.status === "settled";
+
+  // Legacy correction mode detection: submission has exactly 8 OUT teams
+  const isLegacyIncomplete = Boolean(initialSubmission && initialSubmission.outTeamIds?.length === 8);
+  const initialOutSet = useMemo(() => new Set(initialSubmission?.outTeamIds || []), [initialSubmission]);
+  const initialTop8Set = useMemo(() => new Set(initialSubmission?.top8TeamIds || []), [initialSubmission]);
+  const initialFirstId = initialSubmission?.firstTeamId;
+
+  // Correction uses standard Pick'em deadline (pickem_config.deadline_at)
+  const isCorrectionOpen = !isPassed;
 
   // Team mapping
   const teamMap = useMemo(() => {
@@ -72,8 +89,14 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
     return "middle";
   };
 
+  // Newly added OUT teams in correction mode
+  const addedOutTeamIds = useMemo(() => {
+    return outTeamIds.filter((id) => !initialOutSet.has(id));
+  }, [outTeamIds, initialOutSet]);
+
+  // Handlers for Normal Mode
   const handleAssignCategory = (teamId: string, targetCat: "first" | "top8" | "out" | "middle") => {
-    if (isPassed) return;
+    if (isPassed || isLegacyIncomplete) return;
 
     // 1. Remove from all existing assignments
     if (firstTeamId === teamId) setFirstTeamId(undefined);
@@ -90,21 +113,44 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
       }
       setTop8TeamIds((prev) => [...prev.filter((id) => id !== teamId), teamId]);
     } else if (targetCat === "out") {
-      if (outTeamIds.length >= 8 && !outSet.has(teamId)) {
-        setFeedback({ success: false, message: "Kategoria OUT może zawierać maksymalnie 8 drużyn." });
+      if (outTeamIds.length >= 12 && !outSet.has(teamId)) {
+        setFeedback({ success: false, message: "Kategoria OUT może zawierać maksymalnie 12 drużyn." });
         return;
       }
       setOutTeamIds((prev) => [...prev.filter((id) => id !== teamId), teamId]);
     }
   };
 
-  const isComplete = Boolean(firstTeamId && top8TeamIds.length === 7 && outTeamIds.length === 8);
+  // Handlers for Legacy Correction Mode (Only allows moving 4 MIDDLE -> OUT when open)
+  const handleToggleLegacyOut = (teamId: string) => {
+    if (!isCorrectionOpen) return;
 
-  const handleSave = async () => {
-    if (!firstTeamId || top8TeamIds.length !== 7 || outTeamIds.length !== 8) {
+    // Cannot modify original picks
+    if (teamId === initialFirstId || initialTop8Set.has(teamId) || initialOutSet.has(teamId)) {
+      return;
+    }
+
+    if (outSet.has(teamId)) {
+      // Remove from added OUT back to MIDDLE
+      setOutTeamIds((prev) => prev.filter((id) => id !== teamId));
+    } else {
+      // Add to OUT
+      if (outTeamIds.length >= 12) {
+        setFeedback({ success: false, message: "Wybrano już 4 dodatkowe drużyny OUT (łącznie 12/12)." });
+        return;
+      }
+      setOutTeamIds((prev) => [...prev, teamId]);
+    }
+  };
+
+  const isComplete = Boolean(firstTeamId && top8TeamIds.length === 7 && outTeamIds.length === 12);
+  const isLegacyCorrectionReady = Boolean(isLegacyIncomplete && isCorrectionOpen && outTeamIds.length === 12 && addedOutTeamIds.length === 4);
+
+  const handleSaveNormal = async () => {
+    if (!firstTeamId || top8TeamIds.length !== 7 || outTeamIds.length !== 12) {
       setFeedback({
         success: false,
-        message: "Uzupełnij wszystkie kategorie (1 FIRST, 7 TOP 8, 8 OUT) przed zapisaniem.",
+        message: "Uzupełnij wszystkie kategorie (1 FIRST, 7 TOP 8, 12 OUT) przed zapisaniem.",
       });
       return;
     }
@@ -125,6 +171,43 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
       setTimeout(() => setFeedback(null), 5000);
     } else {
       setFeedback({ success: false, message: res.error || "Błąd zapisu Pick'em." });
+    }
+  };
+
+  const handleSaveLegacyCorrection = async () => {
+    if (!isCorrectionOpen) {
+      setFeedback({
+        success: false,
+        message: "Korekta Pick'em jest obecnie niedostępna lub termin minął.",
+      });
+      return;
+    }
+
+    if (addedOutTeamIds.length !== 4 || outTeamIds.length !== 12) {
+      setFeedback({
+        success: false,
+        message: "Wybierz dokładnie 4 dodatkowe drużyny z kategorii MIDDLE do OUT.",
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    setFeedback(null);
+
+    const res = await correctLegacyPickemSubmissionAction({
+      additionalOutTeamIds: addedOutTeamIds,
+    });
+
+    setIsSaving(false);
+
+    if (res.success) {
+      setFeedback({
+        success: true,
+        message: "Korekta Pick'em została zapisana! Zestaw jest kompletny (12 OUT / 16 MIDDLE).",
+      });
+      setTimeout(() => setFeedback(null), 5000);
+    } else {
+      setFeedback({ success: false, message: res.error || "Błąd zapisu korekty Pick'em." });
     }
   };
 
@@ -150,6 +233,68 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
         >
           {feedback.success ? <CheckCircle2 className="w-5 h-5 shrink-0" /> : <XCircle className="w-5 h-5 shrink-0" />}
           <span>{feedback.message}</span>
+        </div>
+      )}
+
+      {/* SPECIAL BANNER: Legacy Correction Required */}
+      {isLegacyIncomplete && (
+        <div
+          className={`p-5 rounded-3xl border flex flex-col gap-3 transition-all ${
+            !isCorrectionOpen
+              ? "bg-slate-900 border-slate-700 text-slate-300"
+              : "bg-amber-950/40 border-amber-500/40 text-amber-200 shadow-xl shadow-amber-500/5"
+          }`}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className={`w-6 h-6 shrink-0 mt-0.5 ${isCorrectionOpen ? "text-amber-400" : "text-slate-400"}`} />
+              <div>
+                <h2 className="text-base font-extrabold text-white">
+                  {isCorrectionOpen
+                    ? "⚠️ Wymagana korekta Pick’em"
+                    : "Korekta Pick’em została zamknięta"}
+                </h2>
+                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  {isCorrectionOpen ? (
+                    <>
+                      Zmieniliśmy liczbę drużyn odpadających z 8 na 12. Twoje dotychczasowe typy (FIRST, TOP 8 oraz 8 OUT) zostały zachowane.{" "}
+                      <strong>Wybierz jeszcze 4 drużyny z kategorii MIDDLE</strong>, które według Ciebie odpadną z Ligi Mistrzów.
+                    </>
+                  ) : (
+                    <>
+                      Termin na uzupełnienie brakujących 4 drużyn OUT upłynął{" "}
+                      <span className="font-bold text-white">
+                        {config?.deadline_at ? new Date(config.deadline_at).toLocaleString("pl-PL") : ""}
+                      </span>
+                      . Zestawy z 8 OUT nie biorą udziału w rozliczeniu punktów.
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {isCorrectionOpen && (
+              <div className="hidden sm:flex flex-col items-end shrink-0 text-right">
+                <span className="text-[11px] text-amber-400 font-bold uppercase tracking-wider">Status korekty</span>
+                <span className="text-xs font-extrabold text-white mt-0.5">
+                  Twoje obecne OUT: {outTeamIds.length}/12
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  {outTeamIds.length < 12 ? `Wybierz jeszcze: ${12 - outTeamIds.length}` : "✓ Gotowe do zapisu"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {isCorrectionOpen && config?.deadline_at && (
+            <div className="flex items-center gap-2 pt-2 border-t border-amber-500/20 text-xs text-amber-300 font-medium">
+              <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                Korektę możesz zapisać do:{" "}
+                <strong className="text-white">{new Date(config.deadline_at).toLocaleString("pl-PL")}</strong>
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -186,12 +331,24 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
         {/* OUT */}
         <div
           className={`p-4 rounded-2xl border transition-all ${
-            outTeamIds.length === 8 ? "bg-rose-950/30 border-rose-500/30" : "bg-slate-900 border-slate-800"
+            outTeamIds.length === 12
+              ? "bg-rose-950/30 border-rose-500/30"
+              : isLegacyIncomplete
+              ? "bg-amber-950/30 border-amber-500/30"
+              : "bg-slate-900 border-slate-800"
           }`}
         >
           <div className="flex items-center justify-between text-xs text-rose-400 font-bold mb-1">
             <span className="flex items-center gap-1.5">🔴 OUT</span>
-            <span className="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">{outTeamIds.length} / 8</span>
+            <span
+              className={`px-2 py-0.5 rounded-full ${
+                outTeamIds.length === 12
+                  ? "bg-rose-500/20 text-rose-300"
+                  : "bg-amber-500/20 text-amber-300 font-extrabold"
+              }`}
+            >
+              {outTeamIds.length} / 12
+            </span>
           </div>
           <p className="text-[11px] text-slate-400">Miejsca 25–36 (+3 pkt / klub)</p>
         </div>
@@ -200,13 +357,15 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
         <div className="p-4 rounded-2xl border bg-slate-900 border-slate-800">
           <div className="flex items-center justify-between text-xs text-purple-400 font-bold mb-1">
             <span className="flex items-center gap-1.5">🟡 MIDDLE</span>
-            <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300">{middleTeams.length} / 20</span>
+            <span className="px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300">
+              {middleTeams.length} / 16
+            </span>
           </div>
           <p className="text-[11px] text-slate-400">Miejsca 9–24 (auto: +3 pkt / klub)</p>
         </div>
       </div>
 
-      {/* Category Filter Tabs */}
+      {/* Category Filter Tabs & Save Action */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
           <button
@@ -266,23 +425,43 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
           </button>
         </div>
 
-        {/* Save Button (Header) */}
-        {!isPassed && (
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!isComplete || isSaving}
-            className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span>Zapisywanie...</span>
-              </>
-            ) : (
-              <span>Zapisz Pick&apos;em ({isComplete ? "Kompletny" : "Niekompletny"})</span>
-            )}
-          </button>
+        {/* Action Button: Normal Save OR Legacy Correction Save */}
+        {isLegacyIncomplete ? (
+          isCorrectionOpen && (
+            <button
+              type="button"
+              onClick={handleSaveLegacyCorrection}
+              disabled={!isLegacyCorrectionReady || isSaving}
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-extrabold shadow-lg shadow-amber-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Zapisywanie korekty...</span>
+                </>
+              ) : (
+                <span>Zapisz korektę Pick&apos;em ({outTeamIds.length}/12 OUT)</span>
+              )}
+            </button>
+          )
+        ) : (
+          !isPassed && (
+            <button
+              type="button"
+              onClick={handleSaveNormal}
+              disabled={!isComplete || isSaving}
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Zapisywanie...</span>
+                </>
+              ) : (
+                <span>Zapisz Pick&apos;em ({isComplete ? "Kompletny" : "Niekompletny"})</span>
+              )}
+            </button>
+          )
         )}
       </div>
 
@@ -290,6 +469,10 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
         {filteredTeams.map((team) => {
           const cat = getTeamCategory(team.id);
+          const isOriginalPick =
+            isLegacyIncomplete &&
+            (team.id === initialFirstId || initialTop8Set.has(team.id) || initialOutSet.has(team.id));
+          const isNewlyAddedOut = isLegacyIncomplete && addedOutTeamIds.includes(team.id);
 
           return (
             <div
@@ -324,7 +507,7 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
 
                 {/* Category Badge */}
                 <span
-                  className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase shrink-0 ${
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase shrink-0 flex items-center gap-1 ${
                     cat === "first"
                       ? "bg-amber-500 text-slate-950"
                       : cat === "top8"
@@ -334,58 +517,92 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
                       : "bg-slate-800 text-slate-400"
                   }`}
                 >
+                  {isOriginalPick && <Lock className="w-2.5 h-2.5" />}
                   {cat === "first" ? "🥇 FIRST" : cat === "top8" ? "🔵 TOP 8" : cat === "out" ? "🔴 OUT" : "🟡 MIDDLE"}
                 </span>
               </div>
 
-              {/* Action Buttons (Disabled if locked) */}
-              {!isPassed && (
-                <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-800/80">
-                  <button
-                    type="button"
-                    onClick={() => handleAssignCategory(team.id, "first")}
-                    className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                      cat === "first"
-                        ? "bg-amber-500 text-slate-950 shadow-md"
-                        : "bg-slate-800/80 hover:bg-amber-950/60 text-slate-300 hover:text-amber-300"
-                    }`}
-                  >
-                    FIRST
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAssignCategory(team.id, "top8")}
-                    className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                      cat === "top8"
-                        ? "bg-blue-600 text-white shadow-md"
-                        : "bg-slate-800/80 hover:bg-blue-950/60 text-slate-300 hover:text-blue-300"
-                    }`}
-                  >
-                    TOP 8
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAssignCategory(team.id, "out")}
-                    className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                      cat === "out"
-                        ? "bg-rose-600 text-white shadow-md"
-                        : "bg-slate-800/80 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300"
-                    }`}
-                  >
-                    OUT
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleAssignCategory(team.id, "middle")}
-                    className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                      cat === "middle"
-                        ? "bg-purple-600/60 text-purple-200"
-                        : "bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    MID
-                  </button>
-                </div>
+              {/* Action Buttons */}
+              {isLegacyIncomplete ? (
+                /* Legacy Correction Mode Buttons */
+                isCorrectionOpen && (
+                  <div className="pt-2 border-t border-slate-800/80">
+                    {isOriginalPick ? (
+                      <div className="py-1 px-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 font-medium flex items-center justify-center gap-1.5">
+                        <Lock className="w-3 h-3 text-slate-500" />
+                        <span>Zachowany wcześniejszy typ</span>
+                      </div>
+                    ) : isNewlyAddedOut ? (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLegacyOut(team.id)}
+                        className="w-full py-1.5 rounded-lg text-[11px] font-extrabold bg-rose-600 hover:bg-rose-500 text-white transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-md shadow-rose-600/20"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Wybrano do OUT (kliknij, aby cofnąć)</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleLegacyOut(team.id)}
+                        disabled={outTeamIds.length >= 12}
+                        className="w-full py-1.5 rounded-lg text-[11px] font-bold bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <span>+ Wybierz jako OUT</span>
+                      </button>
+                    )}
+                  </div>
+                )
+              ) : (
+                /* Normal Mode Buttons */
+                !isPassed && (
+                  <div className="grid grid-cols-4 gap-1.5 pt-2 border-t border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={() => handleAssignCategory(team.id, "first")}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                        cat === "first"
+                          ? "bg-amber-500 text-slate-950 shadow-md"
+                          : "bg-slate-800/80 hover:bg-amber-950/60 text-slate-300 hover:text-amber-300"
+                      }`}
+                    >
+                      FIRST
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAssignCategory(team.id, "top8")}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                        cat === "top8"
+                          ? "bg-blue-600 text-white shadow-md"
+                          : "bg-slate-800/80 hover:bg-blue-950/60 text-slate-300 hover:text-blue-300"
+                      }`}
+                    >
+                      TOP 8
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAssignCategory(team.id, "out")}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                        cat === "out"
+                          ? "bg-rose-600 text-white shadow-md"
+                          : "bg-slate-800/80 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300"
+                      }`}
+                    >
+                      OUT
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAssignCategory(team.id, "middle")}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                        cat === "middle"
+                          ? "bg-purple-600/60 text-purple-200"
+                          : "bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      MID
+                    </button>
+                  </div>
+                )
               )}
             </div>
           );
@@ -416,11 +633,15 @@ export function PickemClient({ config, teams, initialSubmission, allSubmissions 
                         {sub.firstName} {sub.lastName} (@{sub.username})
                       </span>
                     </div>
-                    {sub.pointsAwarded !== null && sub.pointsAwarded !== undefined && (
+                    {sub.pointsAwarded !== null && sub.pointsAwarded !== undefined ? (
                       <span className="font-extrabold text-emerald-400 text-xs">
                         {sub.pointsAwarded} pkt
                       </span>
-                    )}
+                    ) : sub.isLegacyIncomplete ? (
+                      <span className="font-bold text-amber-400 text-[11px] bg-amber-500/10 px-2 py-0.5 rounded-full">
+                        Wymaga korekty (8 OUT)
+                      </span>
+                    ) : null}
                   </div>
 
                   <div className="text-xs space-y-1">

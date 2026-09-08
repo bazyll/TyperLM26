@@ -1,7 +1,7 @@
 export interface PickemSubmissionInput {
   firstTeamId: string;
   top8TeamIds: string[]; // 7 team IDs
-  outTeamIds: string[]; // 8 team IDs
+  outTeamIds: string[]; // 12 team IDs
 }
 
 export interface PickemDetailedScore {
@@ -14,6 +14,7 @@ export interface PickemDetailedScore {
   outHitsCount: number;
   middlePoints: number;
   middleHitsCount: number;
+  isIncomplete?: boolean;
 }
 
 export interface PickemValidationResult {
@@ -26,7 +27,8 @@ export interface PickemValidationResult {
  * Required:
  * - 1 team in firstTeamId
  * - 7 distinct teams in top8TeamIds (none equal to firstTeamId)
- * - 8 distinct teams in outTeamIds (none equal to firstTeamId or top8TeamIds)
+ * - 12 distinct teams in outTeamIds (none equal to firstTeamId or top8TeamIds)
+ * Total explicit teams = 20 (leaving exactly 16 implicit MIDDLE teams)
  */
 export function validatePickemSubmission(
   submission: PickemSubmissionInput,
@@ -48,8 +50,8 @@ export function validatePickemSubmission(
   }
 
   const outSet = new Set(submission.outTeamIds || []);
-  if (outSet.size !== 8) {
-    errors.push(`Kategoria OUT musi zawierać dokładnie 8 różnych drużyn (wybrano ${outSet.size}).`);
+  if (outSet.size !== 12) {
+    errors.push(`Kategoria OUT musi zawierać dokładnie 12 różnych drużyn (wybrano ${outSet.size}).`);
   }
 
   if (outSet.has(submission.firstTeamId)) {
@@ -84,8 +86,9 @@ export function validatePickemSubmission(
 /**
  * Calculates Pick'em score given user submission and final 36-team ordered standing.
  *
- * @param submission User's chosen FIRST (1), TOP8 (7), OUT (8)
+ * @param submission User's chosen FIRST (1), TOP8 (7), OUT (12)
  * @param finalStandings Array of team IDs in exact 1..36 order (index 0 is 1st place, index 35 is 36th place)
+ * @param multiplier Points multiplier (e.g. 1x, 2x)
  */
 export function calculatePickemScore(
   submission: PickemSubmissionInput,
@@ -97,6 +100,29 @@ export function calculatePickemScore(
   }
 
   const mult = Math.max(1, Math.min(10, Math.floor(multiplier || 1)));
+
+  // Guard: Incomplete submission (e.g. legacy 8 OUT instead of 12 OUT) cannot be scored!
+  const isComplete =
+    Boolean(submission.firstTeamId) &&
+    Array.isArray(submission.top8TeamIds) &&
+    submission.top8TeamIds.length === 7 &&
+    Array.isArray(submission.outTeamIds) &&
+    submission.outTeamIds.length === 12;
+
+  if (!isComplete) {
+    return {
+      totalPoints: 0,
+      firstPlacePoints: 0,
+      firstPlaceHit: false,
+      top8Points: 0,
+      top8HitsCount: 0,
+      outPoints: 0,
+      outHitsCount: 0,
+      middlePoints: 0,
+      middleHitsCount: 0,
+      isIncomplete: true,
+    };
+  }
 
   const teamToRank = new Map<string, number>();
   finalStandings.forEach((teamId, index) => {
@@ -118,7 +144,7 @@ export function calculatePickemScore(
   }
   const top8Points = top8HitsCount * 3 * mult;
 
-  // 3. OUT check (8 chosen teams must end in rank 25..36) -> 3 pts base each
+  // 3. OUT check (12 chosen teams must end in rank 25..36) -> 3 pts base each
   let outHitsCount = 0;
   for (const teamId of submission.outTeamIds) {
     const rank = teamToRank.get(teamId);
@@ -128,7 +154,7 @@ export function calculatePickemScore(
   }
   const outPoints = outHitsCount * 3 * mult;
 
-  // 4. MIDDLE check (all remaining 20 teams must end in rank 9..24) -> 3 pts base each
+  // 4. MIDDLE check (all remaining 16 teams must end in rank 9..24) -> 3 pts base each
   const chosenExplicitly = new Set<string>([
     submission.firstTeamId,
     ...submission.top8TeamIds,
@@ -158,5 +184,6 @@ export function calculatePickemScore(
     outHitsCount,
     middlePoints,
     middleHitsCount,
+    isIncomplete: false,
   };
 }

@@ -36,6 +36,8 @@ import {
   X,
   Zap,
   Radio,
+  AlertTriangle,
+  XCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardTitle } from "@/components/ui/card";
@@ -186,6 +188,23 @@ export default function AdminPage() {
   // Pick'em State
   const [editPickemDeadlineModal, setEditPickemDeadlineModal] = useState(false);
   const [pickemDeadlineInput, setPickemDeadlineInput] = useState("");
+  const [pickemSubmissions, setPickemSubmissions] = useState<
+    Array<{
+      userId: string;
+      username: string;
+      firstName: string;
+      lastName: string;
+      avatarUrl: string | null;
+      pointsAwarded?: number | null;
+      firstTeamId?: string;
+      top8TeamIds?: string[];
+      outTeamIds?: string[];
+      outCount: number;
+      middleCount: number;
+      isComplete: boolean;
+      isLegacyIncomplete: boolean;
+    }>
+  >([]);
 
   // Announcements Modal state
   const [showCreateAnnouncementModal, setShowCreateAnnouncementModal] = useState(false);
@@ -240,6 +259,7 @@ export default function AdminPage() {
       setPlayers(pList);
       setSpecialCategories(specList);
       setPickemConfig(pickData.config);
+      setPickemSubmissions((pickData.allSubmissions || []) as any);
       setAnnouncements(annList);
       setAuditLogs(logs);
       setGoalApiStatus(gStatus);
@@ -1160,9 +1180,9 @@ export default function AdminPage() {
         <Card className="rounded-3xl border-slate-800 bg-slate-900 p-6 shadow-xl flex flex-col gap-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
-              <CardTitle className="text-lg font-bold text-white">Rozliczanie Pick&apos;em Fazy Ligowej</CardTitle>
+              <CardTitle className="text-lg font-bold text-white">Rozliczanie i Monitoring Pick&apos;em</CardTitle>
               <p className="text-xs text-slate-400">
-                Po zakończeniu wszystkich 144 meczów fazy ligowej rozlicz typy na podstawie końcowej tabeli UEFA.
+                Kontroluj zestawy graczy (wymagane 1 FIRST, 7 TOP 8, 12 OUT, 16 MIDDLE) oraz rozliczaj typy.
               </p>
             </div>
             {pickemConfig && !pickemConfig.is_locked && new Date(pickemConfig.deadline_at).getTime() > Date.now() && (
@@ -1187,9 +1207,11 @@ export default function AdminPage() {
                 <Trophy className="w-5 h-5 text-amber-400" />
                 <span>{pickemConfig?.status === "settled" ? "Rozliczone (Wyniki zatwierdzone)" : "Otwarte / Oczekujące na zakończenie fazy ligowej"}</span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Deadline: {pickemConfig ? new Date(pickemConfig.deadline_at).toLocaleString("pl-PL") : "Brak"}
-              </p>
+              <div className="flex flex-wrap gap-4 text-xs text-slate-400 mt-2">
+                <span>
+                  Deadline: <strong className="text-white">{pickemConfig ? new Date(pickemConfig.deadline_at).toLocaleString("pl-PL") : "Brak"}</strong>
+                </span>
+              </div>
             </div>
 
             <Button
@@ -1200,6 +1222,96 @@ export default function AdminPage() {
               {isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <Sparkles className="w-4 h-4 mr-1.5" />}
               {pickemConfig?.status === "settled" ? "Przelicz ponownie Pick'em" : "Rozlicz Pick'em"}
             </Button>
+          </div>
+
+          {/* Submissions Monitoring Table */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Users className="w-4 h-4 text-blue-400" />
+                <span>Przesłane zestawy Pick&apos;em ({pickemSubmissions.length})</span>
+              </h3>
+            </div>
+
+            {pickemSubmissions.length === 0 ? (
+              <div className="p-8 rounded-2xl bg-slate-950 border border-slate-800 text-center text-xs text-slate-400">
+                Brak przesłanych zestawów Pick&apos;em.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-800 bg-slate-900/60 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+                    <tr>
+                      <th className="py-3 px-4">Gracz</th>
+                      <th className="py-3 px-3 text-center">🥇 FIRST</th>
+                      <th className="py-3 px-3 text-center">🔵 TOP 8</th>
+                      <th className="py-3 px-3 text-center">🔴 OUT</th>
+                      <th className="py-3 px-3 text-center">🟡 MIDDLE</th>
+                      <th className="py-3 px-4 text-center">Status</th>
+                      <th className="py-3 px-4 text-right">Punkty</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {pickemSubmissions.map((sub) => {
+                      const firstCount = sub.firstTeamId ? 1 : 0;
+                      const top8Count = sub.top8TeamIds?.length || 0;
+                      const outCount = sub.outCount ?? (sub.outTeamIds?.length || 0);
+                      const middleCount = sub.middleCount ?? (36 - (firstCount + top8Count + outCount));
+                      const isComplete = sub.isComplete ?? (firstCount === 1 && top8Count === 7 && outCount === 12);
+                      const isLegacy = sub.isLegacyIncomplete ?? (outCount === 8);
+
+                      return (
+                        <tr key={sub.userId} className="hover:bg-slate-900/40 transition-colors">
+                          <td className="py-3 px-4">
+                            <span className="font-bold text-white block">
+                              {sub.firstName} {sub.lastName}
+                            </span>
+                            <span className="text-[11px] text-slate-500 font-mono">@{sub.username}</span>
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-amber-400">
+                            {firstCount} / 1
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-blue-400">
+                            {top8Count} / 7
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-rose-400">
+                            {outCount} / 12
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-purple-400">
+                            {middleCount} / 16
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {isComplete ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                <CheckCircle2 className="w-3 h-3" />
+                                KOMPLET
+                              </span>
+                            ) : isLegacy ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                                <AlertTriangle className="w-3 h-3" />
+                                WYMAGA KOREKTY (8 OUT)
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                                <XCircle className="w-3 h-3" />
+                                NIEKOMPLETNY ({outCount}/12)
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-extrabold text-sm text-emerald-400">
+                            {sub.pointsAwarded !== null && sub.pointsAwarded !== undefined ? (
+                              `${sub.pointsAwarded} pkt`
+                            ) : (
+                              <span className="text-slate-600 font-normal text-xs">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </Card>
       )}
@@ -2317,13 +2429,17 @@ export default function AdminPage() {
           <Card className="w-full max-w-md bg-slate-900 border-slate-800 p-6 rounded-3xl shadow-2xl">
             <CardTitle className="text-lg font-bold text-white mb-2">Zmień deadline Pick&apos;em</CardTitle>
             <form onSubmit={handleUpdatePickemDeadline} className="flex flex-col gap-4">
-              <Input
-                required
-                type="datetime-local"
-                value={pickemDeadlineInput}
-                onChange={(e) => setPickemDeadlineInput(e.target.value)}
-                className="bg-slate-950 text-xs"
-              />
+              <div>
+                <label className="text-xs text-slate-300 font-medium block mb-1">Deadline (nowe typy i korekty):</label>
+                <Input
+                  required
+                  type="datetime-local"
+                  value={pickemDeadlineInput}
+                  onChange={(e) => setPickemDeadlineInput(e.target.value)}
+                  className="bg-slate-950 text-xs"
+                />
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
                 <Button type="button" variant="outline" size="sm" onClick={() => setEditPickemDeadlineModal(false)}>
                   Anuluj

@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentUserProfile, requireAdminRole } from "@/lib/auth/actions";
 import { ActionResult } from "@/lib/auth/schemas";
-import { savePickemSchema, updatePickemDeadlineSchema } from "./schemas";
+import { savePickemSchema, correctLegacyPickemSchema, updatePickemDeadlineSchema } from "./schemas";
 import { validatePickemSubmission } from "@/lib/scoring/pickem";
 import { calculateUCLTable } from "@/lib/scoring/ucl-table";
 import { PickemSubmissionWithDetails, PickemSelectionItem } from "@/types";
@@ -38,6 +38,10 @@ export async function getPickemDataAction(): Promise<{
     firstTeamId?: string;
     top8TeamIds?: string[];
     outTeamIds?: string[];
+    outCount: number;
+    middleCount: number;
+    isComplete: boolean;
+    isLegacyIncomplete: boolean;
   }>;
 }> {
   const supabase = await createClient();
@@ -129,6 +133,13 @@ export async function getPickemDataAction(): Promise<{
     const prof = sub.profile as ProfileRow | undefined;
     const signedAvatar = prof?.avatar_url ? subAvatarUrls.get(prof.avatar_url) || null : null;
 
+    const outCount = outSels.length;
+    const firstCount = firstSel ? 1 : 0;
+    const top8Count = top8Sels.length;
+    const middleCount = 36 - (firstCount + top8Count + outCount);
+    const isComplete = firstCount === 1 && top8Count === 7 && outCount === 12;
+    const isLegacyIncomplete = outCount === 8;
+
     return {
       userId: sub.user_id,
       username: prof?.username || "gracz",
@@ -139,6 +150,10 @@ export async function getPickemDataAction(): Promise<{
       firstTeamId: firstSel?.team_id,
       top8TeamIds: top8Sels.map((s) => s.team_id),
       outTeamIds: outSels.map((s) => s.team_id),
+      outCount,
+      middleCount,
+      isComplete,
+      isLegacyIncomplete,
     };
   });
 
@@ -151,7 +166,7 @@ export async function getPickemDataAction(): Promise<{
 }
 
 /**
- * Server Action: Save or update Pick'em submission into normalized tables
+ * Server Action: Save or update Pick'em submission into normalized tables (New or full edit)
  */
 export async function savePickemSubmissionAction(
   input: z.infer<typeof savePickemSchema>
@@ -164,7 +179,7 @@ export async function savePickemSubmissionAction(
 
   const { firstTeamId, top8TeamIds, outTeamIds } = parsed.data;
 
-  // Validate disjointness
+  // Validate disjointness (1 FIRST, 7 TOP 8, 12 OUT)
   const validation = validatePickemSubmission({ firstTeamId, top8TeamIds, outTeamIds });
   if (!validation.isValid) {
     return { success: false, error: validation.errors[0] };
@@ -235,6 +250,7 @@ export async function savePickemSubmissionAction(
     revalidatePath("/pickem");
     revalidatePath("/ranking");
     revalidatePath("/konto");
+    revalidatePath("/admin");
     return { success: true };
   } catch (err) {
     console.error("Unexpected error saving pickem:", err);
@@ -243,7 +259,46 @@ export async function savePickemSubmissionAction(
 }
 
 /**
- * Server Action: Admin updates Pick'em deadline (only before deadline has passed)
+ * Server Action: Atomically corrects a legacy 8-OUT submission by adding exactly 4 teams from MIDDLE.
+ * Invokes PostgreSQL RPC correct_legacy_pickem_submission to guarantee full transaction atomicity.
+ */
+export async function correctLegacyPickemSubmissionAction(
+  input: z.infer<typeof correctLegacyPickemSchema>
+): Promise<ActionResult> {
+  const currentUser = await getCurrentUserProfile();
+  if (!currentUser) return { success: false, error: "Wymagane logowanie." };
+
+  const parsed = correctLegacyPickemSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Wybierz dokładnie 4 dodatkowe drużyny." };
+  }
+
+  const { additionalOutTeamIds } = parsed.data;
+  const supabase = await createClient();
+
+  try {
+    const { data: rpcResult, error: rpcErr } = await (supabase.rpc as any)("correct_legacy_pickem_submission", {
+      p_additional_out_team_ids: additionalOutTeamIds,
+    });
+
+    if (rpcErr) {
+      console.error("RPC correct_legacy_pickem_submission error:", rpcErr);
+      return { success: false, error: rpcErr.message || "Błąd podczas zapisywania korekty Pick'em." };
+    }
+
+    revalidatePath("/pickem");
+    revalidatePath("/ranking");
+    revalidatePath("/konto");
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (err: any) {
+    console.error("Unexpected error correcting legacy pickem:", err);
+    return { success: false, error: err?.message || "Wystąpił błąd podczas korekty Pick'em." };
+  }
+}
+
+/**
+ * Server Action: Admin updates Pick'em deadline
  */
 export async function adminUpdatePickemDeadlineAction(
   input: z.infer<typeof updatePickemDeadlineSchema>
@@ -283,7 +338,10 @@ export async function adminUpdatePickemDeadlineAction(
       action: "PICKEM_DEADLINE_UPDATED",
       target_type: "pickem_config",
       target_id: config.id,
-      details: { oldDeadline: config.deadline_at, newDeadline: deadlineAt },
+      details: {
+        oldDeadline: config.deadline_at,
+        newDeadline: deadlineAt,
+      },
     });
 
     revalidatePath("/admin");

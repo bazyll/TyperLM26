@@ -870,6 +870,17 @@ export interface Database {
         };
         Returns: void;
       };
+      correct_legacy_pickem_submission: {
+        Args: {
+          p_additional_out_team_ids: string[];
+        };
+        Returns: {
+          success: boolean;
+          submissionId: string;
+          outCount: number;
+          middleCount: number;
+        };
+      };
       check_and_record_comment_attempt: {
         Args: {
           p_user_id: string;

@@ -150,21 +150,34 @@ describe("Milestone 7X.2 - Points Multipliers & Hardening Tests", () => {
       expect(check.allowed).toBe(false);
     });
 
-    it("calculates Pick'em settlement correctly with multiplier", () => {
+    it("calculates Pick'em settlement correctly with multiplier (108 max pts)", () => {
       const submission = {
         firstTeamId: "team-1",
         top8TeamIds: ["team-2", "team-3", "team-4", "team-5", "team-6", "team-7", "team-8"],
-        outTeamIds: ["team-29", "team-30", "team-31", "team-32", "team-33", "team-34", "team-35", "team-36"],
+        outTeamIds: [
+          "team-25",
+          "team-26",
+          "team-27",
+          "team-28",
+          "team-29",
+          "team-30",
+          "team-31",
+          "team-32",
+          "team-33",
+          "team-34",
+          "team-35",
+          "team-36",
+        ],
       };
 
       const scoreX1 = calculatePickemScore(submission, mock36Teams, 1);
-      expect(scoreX1.totalPoints).toBe(96);
+      expect(scoreX1.totalPoints).toBe(108);
 
       const scoreX2 = calculatePickemScore(submission, mock36Teams, 2);
-      expect(scoreX2.totalPoints).toBe(192);
+      expect(scoreX2.totalPoints).toBe(216);
 
       const scoreX3 = calculatePickemScore(submission, mock36Teams, 3);
-      expect(scoreX3.totalPoints).toBe(288);
+      expect(scoreX3.totalPoints).toBe(324);
     });
   });
 

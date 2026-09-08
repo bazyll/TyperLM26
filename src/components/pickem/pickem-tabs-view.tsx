@@ -74,7 +74,7 @@ export function PickemTabsView({
           <div className="flex items-center gap-3 p-4 rounded-2xl bg-blue-950/40 border border-blue-500/20 text-xs text-blue-300">
             <ShieldAlert className="w-5 h-5 text-blue-400 shrink-0" />
             <span>
-              Wybierz: <strong>1 FIRST</strong> (1. miejsce), <strong>7 TOP 8</strong> (miejsca 1–8) oraz <strong>8 OUT</strong> (miejsca 25–36). Pozostałe 20 drużyn zostanie automatycznie przypisanych do <strong>MIDDLE</strong> (miejsca 9–24). Trafienie w strefę: <strong>{pointsPerHit} pkt</strong> za każdy klub {multiplier > 1 ? `(mnożnik x${multiplier})` : ""}.
+              Wybierz: <strong>1 FIRST</strong> (1. miejsce), <strong>7 TOP 8</strong> (miejsca 1–8) oraz <strong>12 OUT</strong> (miejsca 25–36). Pozostałe 16 drużyn zostanie automatycznie przypisanych do <strong>MIDDLE</strong> (miejsca 9–24). Trafienie w strefę: <strong>{pointsPerHit} pkt</strong> za każdy klub {multiplier > 1 ? `(mnożnik x${multiplier})` : ""}.
             </span>
           </div>
 

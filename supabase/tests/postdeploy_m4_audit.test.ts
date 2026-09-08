@@ -168,11 +168,15 @@ describe("Milestone 4 Post-Deployment Audit Verification", () => {
   describe("Audit Point 6: Pick'em Max Score Calculations", () => {
     const mock36Teams = Array.from({ length: 36 }, (_, i) => `team-${i + 1}`);
 
-    it("calculates perfect Pick'em score under UEFA 16-slot playoff constraint (96 pts)", () => {
+    it("calculates perfect Pick'em score under UEFA 16-slot playoff constraint (108 pts)", () => {
       const submission = {
         firstTeamId: "team-1",
         top8TeamIds: ["team-2", "team-3", "team-4", "team-5", "team-6", "team-7", "team-8"],
         outTeamIds: [
+          "team-25",
+          "team-26",
+          "team-27",
+          "team-28",
           "team-29",
           "team-30",
           "team-31",
@@ -188,13 +192,13 @@ describe("Milestone 4 Post-Deployment Audit Verification", () => {
       expect(score.firstPlacePoints).toBe(3);
       expect(score.top8Points).toBe(21);
       expect(score.middlePoints).toBe(48);
-      expect(score.outPoints).toBe(24);
-      expect(score.totalPoints).toBe(96);
+      expect(score.outPoints).toBe(36);
+      expect(score.totalPoints).toBe(108);
     });
 
-    it("confirms theoretical 36-team formula: 36 clubs * 3 pts = 108 pts", () => {
-      const theoreticalFormula = 1 * 3 + 7 * 3 + 8 * 3 + 20 * 3;
-      expect(theoreticalFormula).toBe(108);
+    it("confirms official 36-team formula: 1 FIRST + 7 TOP8 + 16 MIDDLE + 12 OUT = 108 pts", () => {
+      const formula = 1 * 3 + 7 * 3 + 16 * 3 + 12 * 3;
+      expect(formula).toBe(108);
     });
   });
 
