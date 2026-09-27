@@ -305,6 +305,51 @@ export interface Database {
           }
         ];
       };
+      invalidated_predictions: {
+        Row: {
+          id: string;
+          original_prediction_id: string;
+          user_id: string;
+          match_id: string;
+          old_home_team_id: string;
+          old_away_team_id: string;
+          predicted_home_score: number;
+          predicted_away_score: number;
+          original_created_at: string | null;
+          original_updated_at: string | null;
+          invalidated_at: string;
+          reason: string;
+        };
+        Insert: {
+          id?: string;
+          original_prediction_id: string;
+          user_id: string;
+          match_id: string;
+          old_home_team_id: string;
+          old_away_team_id: string;
+          predicted_home_score: number;
+          predicted_away_score: number;
+          original_created_at?: string | null;
+          original_updated_at?: string | null;
+          invalidated_at?: string;
+          reason?: string;
+        };
+        Update: {
+          id?: string;
+          original_prediction_id?: string;
+          user_id?: string;
+          match_id?: string;
+          old_home_team_id?: string;
+          old_away_team_id?: string;
+          predicted_home_score?: number;
+          predicted_away_score?: number;
+          original_created_at?: string | null;
+          original_updated_at?: string | null;
+          invalidated_at?: string;
+          reason?: string;
+        };
+        Relationships: [];
+      };
       special_prediction_categories: {
         Row: {
           id: string;
