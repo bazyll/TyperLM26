@@ -8,12 +8,14 @@ import { getCurrentUserProfile, requireAdminRole } from "@/lib/auth/actions";
 import { ActionResult } from "@/lib/auth/schemas";
 import {
   savePredictionSchema,
+  saveBatchPredictionsSchema,
   createMatchSchema,
   updateMatchSchema,
   liveScoreSchema,
   finalizeMatchSchema,
 } from "./schemas";
 import { calculateLivePoints } from "@/lib/scoring/matches";
+import { calculateUserTotalPoints } from "@/lib/ranking/ranking-score";
 import { getAvatarSignedUrls } from "@/lib/supabase/storage";
 import { MatchWithTeams, LeaderboardEntry, UserMatchStats } from "@/types";
 import { Database } from "@/types/database.types";
@@ -91,6 +93,113 @@ export async function savePredictionAction(input: z.infer<typeof savePredictionS
   } catch (err) {
     console.error("Unexpected error saving prediction:", err);
     return { success: false, error: "Wystąpił błąd podczas zapisywania typu." };
+  }
+}
+
+/**
+ * Server Action: Atomically save or update multiple match score predictions without page reload.
+ * Validates deadlines and lock guards for every match in the batch (atomic protection).
+ */
+export async function saveBatchPredictionsAction(
+  input: z.infer<typeof saveBatchPredictionsSchema>
+): Promise<ActionResult<{ savedMatchIds: string[] }>> {
+  const currentUser = await getCurrentUserProfile();
+  if (!currentUser) {
+    return { success: false, error: "Wymagane logowanie." };
+  }
+
+  const parsed = saveBatchPredictionsSchema.safeParse(input);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.issues[0]?.message || "Niepoprawne dane typów." };
+  }
+
+  const { predictions } = parsed.data;
+  if (predictions.length === 0) {
+    return { success: true, data: { savedMatchIds: [] } };
+  }
+
+  const matchIds = predictions.map((p) => p.matchId);
+  const supabase = await createClient();
+
+  try {
+    const rpcPayload = predictions.map((p) => ({
+      match_id: p.matchId,
+      home_score: p.homeScore,
+      away_score: p.awayScore,
+    }));
+
+    // 1. Transactional DB-atomic RPC execution in PostgreSQL
+    const { data: rpcResult, error: rpcErr } = await (supabase.rpc as any)(
+      "save_batch_predictions",
+      { p_predictions: rpcPayload }
+    );
+
+    if (rpcErr) {
+      // If RPC function is not yet pushed to remote DB, execute strict server-side validation + atomic bulk upsert
+      const isRpcMissing =
+        rpcErr.code === "PGRST202" ||
+        rpcErr.code === "42883" ||
+        rpcErr.message?.includes("save_batch_predictions");
+
+      if (isRpcMissing) {
+        // Fallback: pre-RPC DB compatibility mode
+        const { data: rawMatches, error: matchesErr } = await supabase
+          .from("matches")
+          .select("id, kickoff_at, is_betting_locked, status")
+          .in("id", matchIds);
+
+        if (matchesErr || !rawMatches) {
+          return { success: false, error: "Błąd podczas weryfikacji meczów." };
+        }
+
+        const matchMap = new Map<string, MatchRow>();
+        (rawMatches as unknown as MatchRow[]).forEach((m) => matchMap.set(m.id, m));
+        const now = Date.now();
+
+        for (const p of predictions) {
+          const match = matchMap.get(p.matchId);
+          if (!match) {
+            return { success: false, error: "Jeden z wybranych meczów nie istnieje." };
+          }
+          const kickoffTime = new Date(match.kickoff_at).getTime();
+          if (now >= kickoffTime || match.is_betting_locked || match.status !== "scheduled") {
+            return {
+              success: false,
+              error: "Jeden lub więcej wybranych meczów zostało już zablokowanych (minął czas na typowanie).",
+            };
+          }
+        }
+
+        const nowIso = new Date().toISOString();
+        const rowsToUpsert = predictions.map((p) => ({
+          user_id: currentUser.id,
+          match_id: p.matchId,
+          home_score: p.homeScore,
+          away_score: p.awayScore,
+          updated_at: nowIso,
+        }));
+
+        const { error: upsertErr } = await (supabase.from("predictions") as unknown as {
+          upsert: (values: Record<string, unknown>[], opts: { onConflict: string }) => Promise<{ error: unknown }>;
+        }).upsert(rowsToUpsert, { onConflict: "user_id,match_id" });
+
+        if (upsertErr) {
+          console.error("Batch prediction upsert error:", upsertErr);
+          return { success: false, error: "Nie udało się zapisać typów. Spróbuj ponownie." };
+        }
+      } else {
+        console.error("RPC save_batch_predictions error:", rpcErr);
+        return { success: false, error: rpcErr.message || "Błąd zapisu typów." };
+      }
+    }
+
+    revalidatePath("/mecze");
+    revalidatePath("/ranking");
+    revalidatePath("/");
+    return { success: true, data: { savedMatchIds: matchIds } };
+  } catch (err) {
+    console.error("Unexpected error saving batch predictions:", err);
+    return { success: false, error: "Wystąpił błąd podczas zapisywania typów." };
   }
 }
 
@@ -645,14 +754,31 @@ export async function getRecentMatchesWithMatrixAction(): Promise<{
 export async function getUserStatsAction(userId: string): Promise<UserMatchStats> {
   const supabase = await createClient();
 
-  const { data: rawPredictions } = await supabase
-    .from("predictions")
-    .select("points_awarded, scoring_category")
-    .eq("user_id", userId);
+  const [
+    { data: rawPredictions },
+    { data: rawSpecialPreds },
+    { data: rawPickemSub },
+  ] = await Promise.all([
+    supabase
+      .from("predictions")
+      .select("points_awarded, scoring_category")
+      .eq("user_id", userId),
+    supabase
+      .from("special_predictions")
+      .select("points_awarded")
+      .eq("user_id", userId),
+    supabase
+      .from("pickem_submissions")
+      .select("points_awarded")
+      .eq("user_id", userId)
+      .maybeSingle(),
+  ]);
 
   const predictions = (rawPredictions || []) as unknown as PredictionRow[];
+  const specialPreds = (rawSpecialPreds || []) as unknown as Array<{ points_awarded: number | null }>;
+  const pickemSub = rawPickemSub as unknown as { points_awarded: number | null } | null;
 
-  let totalPoints = 0;
+  let matchPoints = 0;
   let exact = 0;
   let diff = 0;
   let outcome = 0;
@@ -662,7 +788,7 @@ export async function getUserStatsAction(userId: string): Promise<UserMatchStats
   predictions.forEach((p) => {
     if (p.points_awarded !== null && p.points_awarded !== undefined) {
       count += 1;
-      totalPoints += p.points_awarded;
+      matchPoints += p.points_awarded;
       if (p.scoring_category === "exact") exact += 1;
       else if (p.scoring_category === "diff") diff += 1;
       else if (p.scoring_category === "outcome") outcome += 1;
@@ -670,12 +796,13 @@ export async function getUserStatsAction(userId: string): Promise<UserMatchStats
     }
   });
 
-  const avg = count > 0 ? Number((totalPoints / count).toFixed(2)) : 0;
+  const breakdown = calculateUserTotalPoints(predictions, specialPreds, pickemSub);
+  const avg = count > 0 ? Number((matchPoints / count).toFixed(2)) : 0;
   const accuracy = count > 0 ? Math.round(((exact + diff + outcome) / count) * 100) : 0;
 
   return {
     predictedMatchesCount: count,
-    totalPoints,
+    totalPoints: breakdown.totalPoints,
     exactScoresCount: exact,
     diffScoresCount: diff,
     outcomeScoresCount: outcome,

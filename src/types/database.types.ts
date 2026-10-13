@@ -839,6 +839,105 @@ export interface Database {
         };
         Relationships: [];
       };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          user_agent?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          endpoint?: string;
+          p256dh?: string;
+          auth?: string;
+          user_agent?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      push_preferences: {
+        Row: {
+          user_id: string;
+          enabled: boolean;
+          notify_24h: boolean;
+          notify_3h: boolean;
+          notify_30m: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          enabled?: boolean;
+          notify_24h?: boolean;
+          notify_3h?: boolean;
+          notify_30m?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          enabled?: boolean;
+          notify_24h?: boolean;
+          notify_3h?: boolean;
+          notify_30m?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      push_notification_logs: {
+        Row: {
+          id: string;
+          user_id: string;
+          window_type: string;
+          window_bucket: string;
+          match_ids: string[];
+          status: string;
+          claimed_at: string;
+          sent_at: string | null;
+          error_message: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          window_type: string;
+          window_bucket: string;
+          match_ids?: string[];
+          status?: string;
+          claimed_at?: string;
+          sent_at?: string | null;
+          error_message?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          window_type?: string;
+          window_bucket?: string;
+          match_ids?: string[];
+          status?: string;
+          claimed_at?: string;
+          sent_at?: string | null;
+          error_message?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -936,6 +1035,37 @@ export interface Database {
           is_allowed: boolean;
           remaining_seconds: number;
         }[];
+      };
+      claim_push_notification: {
+        Args: {
+          p_user_id: string;
+          p_window_type: string;
+          p_window_bucket: string;
+          p_match_ids: string[];
+          p_stale_timeout_seconds?: number;
+        };
+        Returns: {
+          claimed: boolean;
+          log_id: string | null;
+          reason: string;
+        }[];
+      };
+      complete_push_notification_claim: {
+        Args: {
+          p_log_id: string;
+          p_status: string;
+          p_error_message?: string | null;
+        };
+        Returns: void;
+      };
+      save_batch_predictions: {
+        Args: {
+          p_predictions: unknown;
+        };
+        Returns: {
+          success: boolean;
+          count: number;
+        };
       };
     };
     Enums: {

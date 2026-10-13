@@ -8,6 +8,10 @@ export const savePredictionSchema = z.object({
   awayScore: scoreInputSchema,
 });
 
+export const saveBatchPredictionsSchema = z.object({
+  predictions: z.array(savePredictionSchema).min(1, "Brak typów do zapisania.").max(50, "Maksymalnie 50 typów w paczce."),
+});
+
 export const createMatchSchema = z.object({
   homeTeamId: z.string().uuid(),
   awayTeamId: z.string().uuid(),

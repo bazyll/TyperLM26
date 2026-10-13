@@ -17,12 +17,13 @@ import {
   Check,
   Loader2,
   Users,
+  AlertCircle,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { getMatchesWithPredictionsAction, savePredictionAction } from "@/lib/matches/actions";
+import { getMatchesWithPredictionsAction, savePredictionAction, saveBatchPredictionsAction } from "@/lib/matches/actions";
 import { calculateLivePoints } from "@/lib/scoring/matches";
 import { MatchWithTeams } from "@/types";
 import { useRealtimeMatches } from "@/lib/supabase/use-realtime-matches";
@@ -40,6 +41,8 @@ export default function MatchesPage() {
   const [predictionInputs, setPredictionInputs] = useState<Record<string, { home: number; away: number }>>({});
   const [expandedPredictions, setExpandedPredictions] = useState<Record<string, boolean>>({});
   const [saveStatus, setSaveStatus] = useState<Record<string, { type: "success" | "error"; message: string }>>({});
+  const [dirtyMatchIds, setDirtyMatchIds] = useState<Set<string>>(new Set());
+  const [savingMatchIds, setSavingMatchIds] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
 
   const loadMatches = async () => {
@@ -61,6 +64,7 @@ export default function MatchesPage() {
         }
       });
       setPredictionInputs(initialInputs);
+      setDirtyMatchIds(new Set());
     } catch (err) {
       console.error("Error loading matches:", err);
     } finally {
@@ -100,18 +104,43 @@ export default function MatchesPage() {
   const handleScoreChange = (matchId: string, team: "home" | "away", delta: number) => {
     const current = predictionInputs[matchId] || { home: 0, away: 0 };
     const nextVal = Math.max(0, Math.min(99, current[team] + delta));
+    const nextHome = team === "home" ? nextVal : current.home;
+    const nextAway = team === "away" ? nextVal : current.away;
+
     setPredictionInputs((prev) => ({
       ...prev,
       [matchId]: {
-        ...(prev[matchId] || { home: 0, away: 0 }),
-        [team]: nextVal,
+        home: nextHome,
+        away: nextAway,
       },
     }));
+
+    const match = matches.find((m) => m.id === matchId);
+    const isDifferent = match?.userPrediction
+      ? match.userPrediction.homeScore !== nextHome || match.userPrediction.awayScore !== nextAway
+      : true;
+
+    setDirtyMatchIds((prev) => {
+      const next = new Set(prev);
+      if (isDifferent) {
+        next.add(matchId);
+      } else {
+        next.delete(matchId);
+      }
+      return next;
+    });
+
+    setSaveStatus((prev) => {
+      if (!prev[matchId]) return prev;
+      const copy = { ...prev };
+      delete copy[matchId];
+      return copy;
+    });
   };
 
   const handleSavePrediction = (matchId: string) => {
     const input = predictionInputs[matchId] || { home: 0, away: 0 };
-    setSaveStatus((prev) => ({ ...prev, [matchId]: { type: "success", message: "Zapisywanie..." } }));
+    setSavingMatchIds((prev) => new Set(prev).add(matchId));
 
     startTransition(async () => {
       const res = await savePredictionAction({
@@ -120,17 +149,115 @@ export default function MatchesPage() {
         awayScore: input.away,
       });
 
+      setSavingMatchIds((prev) => {
+        const next = new Set(prev);
+        next.delete(matchId);
+        return next;
+      });
+
       if (!res.success) {
         setSaveStatus((prev) => ({
           ...prev,
           [matchId]: { type: "error", message: res.error || "Błąd zapisu typu." },
         }));
       } else {
+        setMatches((prev) =>
+          prev.map((m) =>
+            m.id === matchId
+              ? {
+                  ...m,
+                  userPrediction: {
+                    ...(m.userPrediction || {}),
+                    homeScore: input.home,
+                    awayScore: input.away,
+                  },
+                }
+              : m
+          )
+        );
+        setDirtyMatchIds((prev) => {
+          const next = new Set(prev);
+          next.delete(matchId);
+          return next;
+        });
         setSaveStatus((prev) => ({
           ...prev,
-          [matchId]: { type: "success", message: "Typ zapisany" },
+          [matchId]: { type: "success", message: "✓ Typ zapisany" },
         }));
-        loadMatches();
+      }
+    });
+  };
+
+  const handleSaveAll = () => {
+    const nowTime = Date.now();
+    const unsavedToSubmit = matches
+      .filter(
+        (m) =>
+          dirtyMatchIds.has(m.id) &&
+          !m.isBettingLocked &&
+          m.status === "scheduled" &&
+          new Date(m.kickoffAt).getTime() > nowTime
+      )
+      .map((m) => ({
+        matchId: m.id,
+        homeScore: predictionInputs[m.id]?.home ?? 0,
+        awayScore: predictionInputs[m.id]?.away ?? 0,
+      }));
+
+    if (unsavedToSubmit.length === 0) return;
+
+    const savingIds = new Set(unsavedToSubmit.map((p) => p.matchId));
+    setSavingMatchIds((prev) => new Set([...prev, ...savingIds]));
+
+    startTransition(async () => {
+      const res = await saveBatchPredictionsAction({
+        predictions: unsavedToSubmit,
+      });
+
+      setSavingMatchIds((prev) => {
+        const next = new Set(prev);
+        savingIds.forEach((id) => next.delete(id));
+        return next;
+      });
+
+      if (!res.success) {
+        setSaveStatus((prev) => {
+          const next = { ...prev };
+          savingIds.forEach((id) => {
+            next[id] = { type: "error", message: res.error || "Błąd zapisu" };
+          });
+          return next;
+        });
+      } else {
+        const submittedMap = new Map(unsavedToSubmit.map((p) => [p.matchId, p]));
+        setMatches((prev) =>
+          prev.map((m) => {
+            const submitted = submittedMap.get(m.id);
+            if (!submitted) return m;
+            return {
+              ...m,
+              userPrediction: {
+                ...(m.userPrediction || {}),
+                homeScore: submitted.homeScore,
+                awayScore: submitted.awayScore,
+              },
+            };
+          })
+        );
+
+        setDirtyMatchIds((prev) => {
+          const next = new Set(prev);
+          savingIds.forEach((id) => next.delete(id));
+          return next;
+        });
+
+        setSaveStatus((prev) => {
+          const next = { ...prev };
+          savingIds.forEach((id) => {
+            next[id] = { type: "success", message: "✓ Typ zapisany" };
+          });
+          return next;
+        });
       }
     });
   };
@@ -194,6 +321,17 @@ export default function MatchesPage() {
 
   const liveMatchesCount = matches.filter((m) => m.status === "live").length;
 
+  const unsavedCount = useMemo(() => {
+    const nowTime = Date.now();
+    return matches.filter(
+      (m) =>
+        dirtyMatchIds.has(m.id) &&
+        !m.isBettingLocked &&
+        m.status === "scheduled" &&
+        new Date(m.kickoffAt).getTime() > nowTime
+    ).length;
+  }, [matches, dirtyMatchIds]);
+
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto px-1 sm:px-0">
       {/* Header */}
@@ -209,8 +347,20 @@ export default function MatchesPage() {
           <UclHeaderAccent />
         </div>
 
-        {/* Filter Tabs in requested exact order: Najbliższe, Zakończone, Wszystkie */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 no-scrollbar">
+        {/* Filter Tabs & Batch Save */}
+        <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 no-scrollbar">
+          {unsavedCount > 0 && (
+            <Button
+              size="sm"
+              disabled={isPending}
+              onClick={handleSaveAll}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-8 px-3.5 rounded-xl shadow-md shrink-0 cursor-pointer transition-all animate-in fade-in"
+            >
+              <Save className="w-3.5 h-3.5 mr-1.5" />
+              Zapisz wszystko ({unsavedCount})
+            </Button>
+          )}
+
           <Button
             size="sm"
             variant={activeTab === "upcoming" ? "default" : "outline"}
@@ -444,19 +594,28 @@ export default function MatchesPage() {
                   {!isLocked ? (
                     <div className="flex items-center justify-between w-full gap-2">
                       <div className="flex items-center gap-2">
-                        {status?.type === "error" ? (
-                          <span className="text-rose-400 text-[11px] sm:text-xs font-semibold">
-                            {status.message}
-                          </span>
-                        ) : status?.message === "Zapisywanie..." ? (
+                        {savingMatchIds.has(match.id) ? (
                           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-300 text-[11px] font-medium animate-pulse">
                             <Loader2 className="w-3 h-3 animate-spin text-cyan-400" />
                             <span>Zapisywanie...</span>
                           </div>
+                        ) : status?.type === "error" ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[11px] font-semibold">
+                            <AlertCircle className="w-3 h-3 text-rose-400 shrink-0" />
+                            <span>Błąd zapisu</span>
+                            {status.message && (
+                              <span className="hidden sm:inline text-rose-300/80">({status.message})</span>
+                            )}
+                          </div>
+                        ) : dirtyMatchIds.has(match.id) ? (
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] font-semibold animate-pulse">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                            <span>Niezapisane</span>
+                          </div>
                         ) : (match.userPrediction || status?.type === "success") ? (
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-[11px] font-semibold transition-all">
-                            <Check className="w-3.5 h-3.5 text-cyan-400" />
-                            <span>Typ zapisany</span>
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold">
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>✓ Typ zapisany</span>
                           </div>
                         ) : (
                           <span className="text-slate-500 italic text-[11px]">Brak typu</span>
@@ -465,11 +624,15 @@ export default function MatchesPage() {
 
                       <Button
                         size="sm"
-                        disabled={isPending}
+                        disabled={isPending || savingMatchIds.has(match.id)}
                         onClick={() => handleSavePrediction(match.id)}
                         className="bg-blue-600 hover:bg-blue-500 text-xs font-semibold px-3.5 h-8 rounded-xl shrink-0 cursor-pointer"
                       >
-                        <Save className="w-3.5 h-3.5 mr-1" />
+                        {savingMatchIds.has(match.id) ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                        ) : (
+                          <Save className="w-3.5 h-3.5 mr-1" />
+                        )}
                         Zapisz typ
                       </Button>
                     </div>
@@ -632,6 +795,27 @@ export default function MatchesPage() {
           >
             Następna
             <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+      )}
+
+      {/* Floating Save All Bar */}
+      {unsavedCount > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md bg-[#0a1224]/95 border border-emerald-500/40 backdrop-blur-md rounded-2xl p-3 shadow-2xl shadow-emerald-950/60 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2 pl-1">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+            <span className="text-xs font-semibold text-slate-200">
+              Niezapisane typy: <strong className="text-amber-300 font-bold">{unsavedCount}</strong>
+            </span>
+          </div>
+          <Button
+            size="sm"
+            disabled={isPending}
+            onClick={handleSaveAll}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-8 px-4 rounded-xl shadow-md shrink-0 cursor-pointer"
+          >
+            <Save className="w-3.5 h-3.5 mr-1.5" />
+            Zapisz wszystko ({unsavedCount})
           </Button>
         </div>
       )}

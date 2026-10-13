@@ -9,6 +9,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getAvatarSignedUrl, extractAvatarPath } from "@/lib/supabase/storage";
 import { UserProfile } from "@/types";
 import { Database } from "@/types/database.types";
+import { getUserTotalPoints } from "@/lib/ranking/ranking-score";
 import {
   usernameSchema,
   passwordSchema,
@@ -184,6 +185,8 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
       signedAvatarUrl = await getAvatarSignedUrl(profile.avatar_url, 3600);
     }
 
+    const points = await getUserTotalPoints(profile.id, supabase);
+
     return {
       id: profile.id,
       username: profile.username,
@@ -192,7 +195,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
       avatarUrl: signedAvatarUrl,
       role: profile.role,
       isActive: profile.is_active,
-      points: 0,
+      points,
       announcementsLastSeenAt: profile.announcements_last_seen_at || null,
     };
   } catch (err) {

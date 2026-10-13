@@ -17,6 +17,7 @@ import { getUserStatsAction, getLeaderboardAction, getMatchesWithPredictionsActi
 import { uploadAvatar } from "@/lib/supabase/storage";
 import { UserProfile, UserMatchStats, MatchWithTeams } from "@/types";
 import { ProfilePredictionsHistory } from "@/components/profile/profile-predictions-history";
+import { PushNotificationSettings } from "@/components/push-notification-settings";
 import { UclHeaderAccent } from "@/components/branding/ucl-header-accent";
 
 export default function AccountPage() {
@@ -419,6 +420,11 @@ export default function AccountPage() {
               </form>
             </div>
           </Card>
+
+          {/* Section 3: Web Push Notifications */}
+          <div className="md:col-span-2">
+            <PushNotificationSettings />
+          </div>
         </div>
       )}
     </div>
